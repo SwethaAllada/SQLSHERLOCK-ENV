@@ -1,0 +1,61 @@
+---
+title: SQLSherlock Env
+emoji: 🔍
+colorFrom: indigo
+colorTo: cyan
+sdk: docker
+app_port: 7860
+tags:
+  - openenv
+pinned: false
+---
+
+name: sqlsherlock_env
+version: "1.0.0"
+description: >
+  RL environment where an AI agent acts as a data scientist.
+  Investigates real dirty datasets, discovers issues through
+  statistical profiling and SQL queries, fixes with reasoning,
+  validates fixes against raw baseline, exports in original format.
+  No issues are planted — the agent discovers them exactly like
+  a human data scientist would.
+
+tasks:
+  - id: task1_null_and_types
+    name: "Null and type error repair"
+    difficulty: easy
+    max_steps: 20
+    description: >
+      Find and fix null values and type errors in the primary table.
+      Profile columns, identify anomalies, fix with reasoning,
+      validate your work, and export the cleaned dataset.
+
+  - id: task2_constraints_and_fk
+    name: "Constraint and FK integrity"
+    difficulty: medium
+    max_steps: 25
+    description: >
+      Everything in Task 1 plus constraint violations
+      (negative values in must-be-positive columns) and FK
+      violations (orphan references in related tables).
+
+  - id: task3_full_audit_with_trap
+    name: "Full statistical audit with trap"
+    difficulty: hard
+    max_steps: 30
+    description: >
+      Full audit including statistical outliers. TRAP WARNING:
+      one numeric value looks suspicious but is legitimate.
+      You MUST check z-scores before fixing any numeric value.
+      z > 5 = real outlier. z < 3 = leave alone.
+
+env_vars:
+  API_BASE_URL:
+    description: "LLM API endpoint"
+    default: "https://router.huggingface.co/v1"
+  MODEL_NAME:
+    description: "Model identifier for inference"
+    default: "Qwen/Qwen2.5-72B-Instruct"
+  HF_TOKEN:
+    description: "HuggingFace API token (set as Space secret)"
+    required: true
