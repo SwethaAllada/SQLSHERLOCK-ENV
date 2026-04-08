@@ -284,18 +284,6 @@ Rule: Always `profile_column` before fixing numeric values. z > 5 = outlier (fix
 
 ---
 
-## Baseline Scores (phihung/titanic, 500 rows)
-
-| Task | Difficulty | Baseline Score |
-|---|---|---|
-| `task1_null_and_types` | Easy | **0.652** |
-| `task2_constraints_and_fk` | Medium | **0.861** |
-| `task3_full_audit_with_trap` | Hard | **0.658** |
-| **Average** | | **0.724** |
-
-Runtime: ~50-90 seconds for all 3 tasks. Well within the 20-minute limit.
-
----
 
 ## Setup on a New Device
 
