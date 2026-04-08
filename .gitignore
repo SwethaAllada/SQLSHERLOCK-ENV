@@ -29,5 +29,4 @@ Thumbs.db
 # Pytest
 .pytest_cache/
 
-# UV lock (package-level, not needed at repo root)
-uv.lock
+# UV lock kept in repo for openenv validate
