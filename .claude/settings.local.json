@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(PYTHONPATH=sqlsherlock_env .venv/Scripts/python -c \"from openenv.core.env_server import Environment; import inspect; print\\([m for m in dir\\(Environment\\) if not m.startswith\\('__'\\)]\\); print\\(inspect.getmembers\\(Environment, predicate=inspect.isfunction\\)\\)\")",
+      "Bash(PYTHONPATH=sqlsherlock_env .venv/Scripts/python -c \"from openenv.core.env_server import Environment; import inspect; src = inspect.getsource\\(Environment.state\\); print\\(src\\)\")",
+      "Bash(PYTHONPATH=sqlsherlock_env .venv/Scripts/python -m pytest tests/ -v)",
+      "Bash(PYTHONPATH=sqlsherlock_env .venv/Scripts/python -m pytest tests/test_issue_detector.py::TestDuplicateDetection tests/test_issue_detector.py::TestDetectTrap tests/test_graders.py::TestTask1Grader -v)",
+      "Bash(PYTHONPATH=\"c:/Users/HP/OneDrive/Desktop/SQLSherlock-env/sqlsherlock_env\" \"c:/Users/HP/OneDrive/Desktop/SQLSherlock-env/.venv/Scripts/uvicorn\" server.app:app --host 0.0.0.0 --port 7860)",
+      "Bash(.venv/Scripts/python -c ':*)",
+      "Bash(PYTHONPATH=sqlsherlock_env .venv/Scripts/python -m pytest tests/ -v --tb=short)"
+    ]
+  }
+}

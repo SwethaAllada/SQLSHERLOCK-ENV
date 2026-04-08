@@ -1,0 +1,9 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.8.2
+openenv-core>=0.2.1
+openai>=1.40.0
+python-multipart>=0.0.9
+datasets>=2.20.0
+pandas>=2.0.0
+pyarrow>=14.0.0

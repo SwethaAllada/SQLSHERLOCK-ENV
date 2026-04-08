@@ -1,0 +1,46 @@
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+# All rights reserved.
+#
+# This source code is licensed under the BSD-style license found in the
+# LICENSE file in the root directory of this source tree.
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sqlsherlock-env"
+version = "1.0.0"
+description = "RL environment where an AI agent acts as a data scientist investigating dirty datasets"
+requires-python = ">=3.11"
+dependencies = [
+  "openenv-core>=0.2.1",
+  "fastapi>=0.115.0",
+  "uvicorn[standard]>=0.30.0",
+  "pydantic>=2.8.2",
+  "openai>=1.40.0",
+  "python-multipart>=0.0.9",
+  "datasets>=2.20.0",
+  "pandas>=2.0.0",
+  "pyarrow>=14.0.0",
+]
+
+[project.optional-dependencies]
+train = [
+  "trl>=0.15.0",
+  "transformers>=4.47.0",
+  "torch>=2.5.0",
+]
+dev = [
+  "pytest>=8.0",
+  "httpx>=0.27",
+]
+
+[project.scripts]
+server = "server.app:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
