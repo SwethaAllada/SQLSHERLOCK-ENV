@@ -100,21 +100,10 @@ class SQLSherlockEnvironment(Environment):
         Raises:
             ValueError: If dataset or task_id is missing/invalid.
         """
-        dataset = kwargs.get("dataset", "")
-        task_id = kwargs.get("task_id", "")
-        seed    = int(kwargs.get("seed", 42))
+        dataset  = kwargs.get("dataset", "") or "phihung/titanic"
+        task_id  = kwargs.get("task_id", "") or "task1_null_and_types"
+        seed     = int(kwargs.get("seed", 42))
         max_rows = int(kwargs.get("max_rows", 500))
-
-        if not dataset or not dataset.strip():
-            raise ValueError(
-                "reset() requires 'dataset' keyword argument. "
-                "Provide a file path, HuggingFace dataset name, or raw CSV text."
-            )
-        if not task_id or not task_id.strip():
-            raise ValueError(
-                "reset() requires 'task_id' keyword argument. "
-                f"Valid tasks: {sorted(_TASK_MAP.keys())}"
-            )
         if task_id not in _TASK_MAP:
             raise ValueError(
                 f"Unknown task_id '{task_id}'. "
