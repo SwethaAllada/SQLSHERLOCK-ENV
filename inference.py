@@ -37,15 +37,19 @@ DEMO_DATASET       = "phihung/titanic"
 INFERENCE_MAX_ROWS = 500
 ENV_NAME           = "sqlsherlock_env"
 
-API_BASE_URL = os.getenv("API_BASE_URL") or "https://router.huggingface.co/v1"
-MODEL_NAME   = os.getenv("MODEL_NAME")   or "Qwen/Qwen2.5-72B-Instruct"
-API_KEY      = os.getenv("HF_TOKEN")     or os.getenv("OPENAI_API_KEY") or "none"
+API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+MODEL_NAME   = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-72B-Instruct")
+HF_TOKEN     = os.getenv("HF_TOKEN")
 SPACE_URL    = os.getenv("SPACE_URL",    "http://localhost:7860")
 
+# Optional — if you use from_docker_image():
+LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
+
+# Use full environment max_steps — no artificial restriction
 STEP_BUDGETS: dict[str, int] = {
-    "task1_null_and_types":         20,
-    "task2_constraints_and_fk":     25,
-    "task3_full_audit_with_trap":   30,
+    "task1_null_and_types":         20,   # env max_steps = 20
+    "task2_constraints_and_fk":     25,   # env max_steps = 25
+    "task3_full_audit_with_trap":   30,   # env max_steps = 30
 }
 
 TASKS = [
@@ -203,7 +207,7 @@ def run_task(task_id: str) -> float:
     log_start(task=task_id, model=MODEL_NAME)
 
     try:
-        llm = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+        llm = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
     except Exception as exc:
         log_step(1, "init_llm", 0.0, True, str(exc)[:80])
         log_end(False, 0, 0.0, [])

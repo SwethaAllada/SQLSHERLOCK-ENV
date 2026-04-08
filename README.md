@@ -18,7 +18,7 @@ An RL environment where an AI agent acts as a data scientist investigating a dir
 
 The agent discovers real data quality issues through statistical investigation — exactly like a human data scientist — fixes them with documented reasoning, validates fixes against the raw baseline, and exports the cleaned output in the same format as the input.
 
-**The environment does NOT plant or inject issues.** Real datasets already have data quality problems. The issue detector scans the dataset at `reset()` time and builds a ground-truth catalogue from what it finds. The agent never sees this catalogue — it must discover everything through investigation.
+ Real datasets already have data quality problems. The issue detector scans the dataset at `reset()` time and builds a ground-truth catalogue from what it finds. The agent never sees this catalogue — it must discover everything through investigation.
 
 ---
 

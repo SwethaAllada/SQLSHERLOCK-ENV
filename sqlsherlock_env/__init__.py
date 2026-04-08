@@ -6,8 +6,14 @@
 
 """SQLSherlock-Env — RL environment for AI data scientist agents."""
 
-from client import SQLSherlockEnv
-from models import SQLSherlockAction, SQLSherlockObservation, SQLSherlockState
+try:
+    # When running from within sqlsherlock_env/ (PYTHONPATH=.)
+    from client import SQLSherlockEnv
+    from models import SQLSherlockAction, SQLSherlockObservation, SQLSherlockState
+except ImportError:
+    # When imported as a package (import sqlsherlock_env)
+    from sqlsherlock_env.client import SQLSherlockEnv
+    from sqlsherlock_env.models import SQLSherlockAction, SQLSherlockObservation, SQLSherlockState
 
 __version__ = "1.0.0"
 

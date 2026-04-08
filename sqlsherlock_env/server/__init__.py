@@ -6,6 +6,9 @@
 
 """SQLSherlock-Env server components."""
 
-from server.environment import SQLSherlockEnvironment, TASKS
+try:
+    from server.environment import SQLSherlockEnvironment, TASKS
+except ImportError:
+    from sqlsherlock_env.server.environment import SQLSherlockEnvironment, TASKS
 
 __all__ = ["SQLSherlockEnvironment", "TASKS"]
