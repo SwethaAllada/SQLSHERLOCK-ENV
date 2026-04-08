@@ -73,9 +73,9 @@ class TestTasksCatalogue:
 
     def test_max_steps_values(self):
         step_map = {t["id"]: t["max_steps"] for t in TASKS}
-        assert step_map["task1_null_and_types"]       == 20
-        assert step_map["task2_constraints_and_fk"]   == 25
-        assert step_map["task3_full_audit_with_trap"] == 30
+        assert step_map["task1_null_and_types"]       == 30
+        assert step_map["task2_constraints_and_fk"]   == 40
+        assert step_map["task3_full_audit_with_trap"] == 50
 
 
 # ---------------------------------------------------------------------------
@@ -99,13 +99,16 @@ class TestReset:
         obs = env.reset(dataset=RAW_CSV_TEXT, task_id="task1_null_and_types")
         assert obs.step == 0
 
-    def test_reset_no_dataset_raises(self, env):
-        with pytest.raises(ValueError, match="dataset"):
-            env.reset(dataset="", task_id="task1_null_and_types")
+    def test_reset_no_dataset_uses_default(self, env):
+        """Empty dataset defaults to phihung/titanic."""
+        obs = env.reset(dataset="", task_id="task1_null_and_types")
+        assert isinstance(obs, SQLSherlockObservation)
+        assert len(obs.tables_summary) > 0
 
-    def test_reset_no_task_raises(self, env):
-        with pytest.raises(ValueError, match="task_id"):
-            env.reset(dataset=RAW_CSV_TEXT, task_id="")
+    def test_reset_no_task_uses_default(self, env):
+        """Empty task_id defaults to task1_null_and_types."""
+        obs = env.reset(dataset=RAW_CSV_TEXT, task_id="")
+        assert isinstance(obs, SQLSherlockObservation)
 
     def test_reset_invalid_task_raises(self, env):
         with pytest.raises(ValueError, match="Unknown task_id"):
@@ -391,7 +394,7 @@ class TestMaxSteps:
         env.reset(dataset=RAW_CSV_TEXT, task_id="task1_null_and_types")
         table = list(env._db.table_names())[0]
         done = False
-        for _ in range(25):   # more than max_steps=20
+        for _ in range(35):   # more than max_steps=30
             _, _, done, _ = _step(env,
                 SQLSherlockAction(action_type="inspect", table=table)
             )
