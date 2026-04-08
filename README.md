@@ -19,7 +19,7 @@ pinned: false
 Data cleaning consumes ~80% of a data scientist's time. This environment trains and evaluates AI agents to do it automatically: discover issues through statistical investigation, fix them with the right imputation strategy per column type, validate fixes, and export a clean dataset.
 
 **Key design principles:**
-- **No planted issues** — the environment scans real datasets at `reset()` and builds a ground-truth issue catalogue from what it actually finds
+- **Real world data scanning** — the environment scans real datasets at `reset()` and builds a ground-truth issue catalogue from what it actually finds
 - **Any dataset** — pass any HuggingFace dataset URL, local CSV/JSON/Parquet file, or raw CSV text
 - **Production data cleaning** — handles nulls, type errors, constraint violations, outliers, duplicates, whitespace issues, and inconsistent categories
 - **Dense reward signal** — every action produces a training signal, not just end-of-episode binary feedback
