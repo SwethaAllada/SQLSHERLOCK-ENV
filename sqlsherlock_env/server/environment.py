@@ -33,7 +33,7 @@ TASKS: list[dict] = [
         "id":          "task1_null_and_types",
         "name":        "Null and type error repair",
         "difficulty":  "easy",
-        "max_steps":   20,
+        "max_steps":   30,
         "description": (
             "Find and fix null values and type errors in the primary table. "
             "Profile columns, identify anomalies, fix with reasoning, "
@@ -44,7 +44,7 @@ TASKS: list[dict] = [
         "id":          "task2_constraints_and_fk",
         "name":        "Constraint and FK integrity",
         "difficulty":  "medium",
-        "max_steps":   25,
+        "max_steps":   40,
         "description": (
             "Everything in Task 1 plus constraint violations "
             "(negative values in must-be-positive columns) and FK "
@@ -55,7 +55,7 @@ TASKS: list[dict] = [
         "id":          "task3_full_audit_with_trap",
         "name":        "Full statistical audit with trap",
         "difficulty":  "hard",
-        "max_steps":   30,
+        "max_steps":   50,
         "description": (
             "Full audit including statistical outliers. TRAP WARNING: "
             "one numeric value looks suspicious but is legitimate. "

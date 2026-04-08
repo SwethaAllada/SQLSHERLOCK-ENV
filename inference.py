@@ -45,11 +45,11 @@ SPACE_URL    = os.getenv("SPACE_URL",    "http://localhost:7860")
 # Optional — if you use from_docker_image():
 LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
 
-# Use full environment max_steps — no artificial restriction
+# Full environment max_steps — agent gets maximum room to clean
 STEP_BUDGETS: dict[str, int] = {
-    "task1_null_and_types":         20,   # env max_steps = 20
-    "task2_constraints_and_fk":     25,   # env max_steps = 25
-    "task3_full_audit_with_trap":   30,   # env max_steps = 30
+    "task1_null_and_types":         30,   # env max_steps = 30
+    "task2_constraints_and_fk":     40,   # env max_steps = 40
+    "task3_full_audit_with_trap":   50,   # env max_steps = 50
 }
 
 TASKS = [
