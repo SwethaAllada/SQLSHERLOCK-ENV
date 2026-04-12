@@ -18,15 +18,18 @@ from openenv.core.env_server.types import Action, Observation, State
 from pydantic import Field
 
 ActionType = Literal[
-    "inspect",         # view all rows in a table
-    "profile_column",  # stats: mean/std/min/max/nulls/z_scores per col
-    "run_sql",         # SELECT query only
-    "fix_cell",        # correct one cell value with reason
-    "fix_column",      # fix ALL nulls in a column with one value (bulk operation)
-    "delete_row",      # remove a row with reason
-    "validate",        # run all 6 checks: before vs after
-    "submit",          # end episode and score
-    "export",          # terminal: write cleaned file, return URL
+    "inspect",          # view all rows in a table
+    "profile_column",   # stats: mean/std/min/max/nulls/z_scores per col
+    "run_sql",          # SELECT query only
+    "fix_cell",         # correct one cell value with reason
+    "fix_column",       # fix ALL nulls in a column with one value (bulk operation)
+    "delete_row",       # remove a row with reason
+    "validate",         # run all 6 checks: before vs after
+    "submit",           # end episode and score
+    "export",           # terminal: write cleaned file, return URL
+    "select_tables",    # declare which tables to include in multi-table analysis
+    "join_tables",      # join two tables on a matching key column
+    "classify_intent",  # declare the inferred cleaning intent for this dataset
 ]
 
 
@@ -72,6 +75,19 @@ class SQLSherlockAction(Action):
     reason: Optional[str] = Field(
         default=None,
         description="Statistical justification for this action (required for fix_cell, delete_row).",
+    )
+    # --- Multi-table reasoning fields ---
+    tables: Optional[list[str]] = Field(
+        default=None,
+        description="List of table names to select (for select_tables action).",
+    )
+    table2: Optional[str] = Field(
+        default=None,
+        description="Second table name for join_tables action.",
+    )
+    key: Optional[str] = Field(
+        default=None,
+        description="Join key column in the primary table (for join_tables action).",
     )
 
 
@@ -125,6 +141,14 @@ class SQLSherlockObservation(Observation):
         default=False,
         description="True when the episode has ended.",
     )
+    intent: Optional[str] = Field(
+        default=None,
+        description=(
+            "Cleaning intent for this episode if explicitly provided: "
+            "dashboard | ml_training | reporting. "
+            "None means the agent must infer it via classify_intent."
+        ),
+    )
 
 
 class SQLSherlockState(State):
@@ -168,4 +192,20 @@ class SQLSherlockState(State):
     validation_called: bool = Field(
         default=False,
         description="Whether the agent called validate() at least once.",
+    )
+    intent: Optional[str] = Field(
+        default=None,
+        description="Cleaning intent for this episode (dashboard|ml_training|reporting|None).",
+    )
+    tables_selected: list[str] = Field(
+        default_factory=list,
+        description="Tables the agent explicitly selected for multi-table analysis.",
+    )
+    joins_performed: int = Field(
+        default=0,
+        description="Number of join_tables operations performed.",
+    )
+    output_format: Optional[str] = Field(
+        default=None,
+        description="User-requested output format override (csv|json|parquet|jsonl).",
     )

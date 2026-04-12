@@ -5,16 +5,19 @@
 # LICENSE file in the root directory of this source tree.
 
 """
-Task 3 grader — Full statistical audit with trap.
+Task 3 grader — Business Analytics Query (Hard).
+
+Intent: business_query
+Issues scored: all task2 + fk_violation + trap
 
 Scoring formula:
     task3_score = task2_score × 0.50
-                + audit_issues_resolved × 0.50
+                + fk_resolved × 0.50
                 + reasoning_bonus (0.05)
                 - trap_penalty (0.40 if trap hit)
 
-audit_issues_resolved = weighted resolution score for
-outlier + duplicate issue types.
+fk_resolved is the weighted resolution score for fk_violation issue type.
+The trap tests whether the agent checks z-scores before "fixing" values.
 """
 
 from server.database import DatabaseEngine
@@ -26,7 +29,7 @@ from server.graders.universal import (
     _reasoning_bonus,
 )
 
-_AUDIT_FILTER = {"outlier", "duplicate"}
+_FK_FILTER = {"fk_violation"}
 
 
 def grade(
@@ -54,7 +57,8 @@ def grade(
         if db.total_issues > 0:
             return 0.0
 
-    # task2 component (null + type + constraint + fk)
+    # task2 component (null + type + whitespace + inconsistent_category +
+    #                   constraint + outlier + duplicate)
     t2 = task2_grade(
         db=db,
         cleaned_rows=cleaned_rows,
@@ -62,33 +66,34 @@ def grade(
         validation_was_called=validation_was_called,
     )
 
-    # Audit issues: outlier + duplicate
-    audit_issues = [
-        i for i in db.issue_registry if i.issue_type in _AUDIT_FILTER
-    ]
-    if audit_issues:
-        audit_score, _ = _resolution_score(
-            audit_issues, cleaned_rows, removed_ids, pk_col, db
-        )
-    else:
-        audit_score = 1.0   # No audit issues → full credit
+    # FK violation resolution score
+    fk_issues = [i for i in db.issue_registry if i.issue_type in _FK_FILTER]
 
-    # Trap penalty
+    # Trap penalty (−0.40 if trap value was changed; applies to all hard tasks)
     trap_pen = _trap_penalty(
         db, cleaned_rows, removed_ids, pk_col,
-        task_id="task3_full_audit_with_trap",
+        task_id=db.task_id,
     )
 
-    # Reasoning bonus
-    r_bonus = _reasoning_bonus(db, "task3_full_audit_with_trap", validation_was_called)
+    # Reasoning bonus (+0.05 if statistical reasoning terms were used in reasons)
+    r_bonus = _reasoning_bonus(db, db.task_id, validation_was_called)
 
     # NOTE: FP penalty is already applied inside t2 (task2_grade) — not applied
     # again here to avoid double-counting.
 
-    raw = (
-        t2          * 0.50
-        + audit_score * 0.50
-        + r_bonus
-        - trap_pen
-    )
+    if fk_issues:
+        # Dataset has FK violations — score FK resolution as 50% of hard grade
+        fk_score, _ = _resolution_score(fk_issues, cleaned_rows, removed_ids, pk_col, db)
+        raw = (
+            t2        * 0.50
+            + fk_score  * 0.50
+            + r_bonus
+            - trap_pen
+        )
+    else:
+        # Single-table dataset — no FK issues to resolve.
+        # Hard difficulty is demonstrated entirely through trap avoidance and reasoning.
+        # Grade purely on medium performance + trap + reasoning (no free FK credit).
+        raw = t2 + r_bonus - trap_pen
+
     return max(0.0, min(1.0, round(raw, 4)))

@@ -25,6 +25,7 @@ INVEST_REWARDS: dict[str, float] = {
     "inspect":        0.02,
     "profile_column": 0.03,
     "run_sql":        0.03,
+    "select_tables":  0.02,
 }
 
 INVEST_CAPS: dict[str, int] = {
@@ -32,6 +33,7 @@ INVEST_CAPS: dict[str, int] = {
     "profile_column": 3,
     "run_sql":        3,
     "validate":       2,
+    "select_tables":  2,
 }
 
 FIX_CORRECT:        float =  0.15
@@ -44,6 +46,22 @@ DELETE_FALSE_POSITIVE: float = -0.20
 
 SUBMIT_ALL_RESOLVED:   float =  0.10
 SUBMIT_ISSUES_OPEN:    float = -0.10
+
+# --- Intent-aware and multi-table rewards ---
+INTENT_ALIGNED:      float =  0.10   # fix action aligns with declared intent
+INTENT_MISALIGNED:   float = -0.10   # fix action contradicts intent (e.g. delete on dashboard)
+CLASSIFY_CORRECT:    float =  0.10   # agent correctly inferred the episode intent
+CLASSIFY_INCORRECT:  float = -0.10   # agent misclassified the intent
+JOIN_CORRECT:        float =  0.20   # valid join with correct key
+JOIN_INCORRECT:      float = -0.20   # invalid join (wrong key / cartesian product)
+
+# Issue types that align with each intent
+_INTENT_ISSUE_TYPES: dict[str, set[str]] = {
+    "visualization":    {"null", "type_error", "whitespace", "inconsistent_category"},
+    "ml_training":      {"null", "type_error", "constraint", "outlier", "duplicate"},
+    "business_query":   {"null", "whitespace", "inconsistent_category", "type_error",
+                         "fk_violation", "constraint"},
+}
 
 
 # ---------------------------------------------------------------------------
@@ -120,10 +138,13 @@ class RB:
     fix_delta:  float = 0.0   # fix / delete reward (positive or negative)
     validate_b: float = 0.0   # validate bonus
     penalty:    float = 0.0   # trap / fp / submit penalties (stored negative)
+    intent_r:   float = 0.0   # intent alignment bonus/penalty
+    join_r:     float = 0.0   # join quality reward
 
     @property
     def total(self) -> float:
-        raw = self.invest + self.fix_delta + self.validate_b + self.penalty
+        raw = (self.invest + self.fix_delta + self.validate_b
+               + self.penalty + self.intent_r + self.join_r)
         return max(-1.0, min(1.0, round(raw, 4)))
 
     def to_dict(self) -> dict:
@@ -132,6 +153,8 @@ class RB:
             "fix_delta":  round(self.fix_delta, 4),
             "validate_b": round(self.validate_b, 4),
             "penalty":    round(self.penalty, 4),
+            "intent_r":   round(self.intent_r, 4),
+            "join_r":     round(self.join_r, 4),
             "total":      self.total,
         }
 
@@ -146,6 +169,9 @@ def calc(
     counter: InvestCounter,
     action: Any,                      # SQLSherlockAction
     validation_result: Optional[Any] = None,  # ValidationResult | None
+    intent: Optional[str] = None,     # episode cleaning intent (dashboard|ml_training|reporting)
+    correct_intent: Optional[str] = None,  # grader-known correct intent (for classify_intent)
+    join_valid: Optional[bool] = None,     # result of join validation (for join_tables)
 ) -> RB:
     """Compute per-step reward for one action.
 
@@ -166,6 +192,38 @@ def calc(
     # ------------------------------------------------------------------
     if action_type in ("inspect", "profile_column", "run_sql"):
         rb.invest = counter.record(action_type)
+        return rb
+
+    if action_type == "select_tables":
+        # Only reward if there are actually multiple tables to explore
+        if len(db.table_names()) >= 2:
+            rb.invest = counter.record(action_type)
+        # else: single-table episode — no reward for pointless select_tables
+        return rb
+
+    # ------------------------------------------------------------------
+    # classify_intent — agent declares inferred cleaning intent
+    # ------------------------------------------------------------------
+    if action_type == "classify_intent":
+        guessed = str(getattr(action, "value", "") or "").strip().lower()
+        valid_intents = {"visualization", "ml_training", "business_query"}
+        if guessed not in valid_intents:
+            # Unknown intent string — small penalty
+            rb.intent_r = CLASSIFY_INCORRECT * 0.5
+        elif correct_intent is not None:
+            rb.intent_r = CLASSIFY_CORRECT if guessed == correct_intent else CLASSIFY_INCORRECT
+        # If correct_intent is None, no intent reward (episode has no hidden target)
+        return rb
+
+    # ------------------------------------------------------------------
+    # join_tables — validate the join quality
+    # ------------------------------------------------------------------
+    if action_type == "join_tables":
+        if join_valid is True:
+            rb.join_r = JOIN_CORRECT
+        elif join_valid is False:
+            rb.join_r = JOIN_INCORRECT
+        # join_valid=None means we couldn't determine → neutral
         return rb
 
     # ------------------------------------------------------------------
@@ -218,6 +276,12 @@ def calc(
         else:
             rb.fix_delta = FIX_WRONG_VALUE
 
+        # Intent alignment bonus: fixing an intent-aligned issue type
+        if intent and rb.fix_delta > 0:
+            aligned_types = _INTENT_ISSUE_TYPES.get(intent, set())
+            if issue_match.issue_type in aligned_types:
+                rb.intent_r = INTENT_ALIGNED * 0.5   # half-weight per individual cell
+
         return rb
 
     # ------------------------------------------------------------------
@@ -241,6 +305,10 @@ def calc(
         else:
             rb.penalty = DELETE_FALSE_POSITIVE
 
+        # Intent misalignment: visualization prefers row preservation over deletion
+        if intent == "visualization" and rb.fix_delta > 0:
+            rb.intent_r = INTENT_MISALIGNED * 0.3  # mild penalty for visualization + delete
+
         return rb
 
     # ------------------------------------------------------------------
@@ -258,9 +326,16 @@ def calc(
             if iss.column == column and iss.issue_type in ("null", "type_error", "whitespace")
         ]
         if column_issues:
-            # Reward proportional to issues resolved (capped at +0.15)
+            # Reward scales with what fraction of all issues this bulk fix covers.
+            # FIX_CORRECT * (1.0 + 2.0 * fraction) → range +0.15 to +0.45
             resolved_fraction = min(len(column_issues) / max(db.total_issues, 1), 1.0)
-            rb.fix_delta = round(FIX_CORRECT * (1.0 + resolved_fraction), 4)  # +0.15 to +0.30
+            rb.fix_delta = round(FIX_CORRECT * (1.0 + 2.0 * resolved_fraction), 4)
+            # Intent alignment: fixing null/whitespace aligns with dashboard/reporting
+            if intent:
+                aligned_types = _INTENT_ISSUE_TYPES.get(intent, set())
+                aligned_issues = [i for i in column_issues if i.issue_type in aligned_types]
+                if aligned_issues:
+                    rb.intent_r = INTENT_ALIGNED * 0.5
         else:
             # No registered issues in this column — possible false positive
             rb.penalty = FIX_FALSE_POSITIVE * 0.5  # lighter penalty for bulk ops
@@ -352,16 +427,30 @@ def _fix_resolves(issue: Any, new_value: Any, db: Any) -> bool:
             return False
 
     if itype == "outlier":
-        # Resolves if new z-score <= 3
+        # Resolves if new value is within 2 std of the stored correct (column median).
+        # Using the stored correct avoids relying on contaminated profile statistics.
+        if not _can_cast_float(new_value):
+            return False
+        fval = float(str(new_value))
+        correct = issue.correct
+        if correct is not None and correct != SENTINEL_UNKNOWN and _can_cast_float(correct):
+            cf = float(str(correct))
+            profile = db._profiles.get(db.primary_table, {})
+            p = profile.get(issue.column, {})
+            std = p.get("std")
+            if std and std > 0:
+                return abs(fval - cf) / std <= 2.0
+            # No std available — any value close to the median counts
+            return abs(fval - cf) <= abs(cf) * 0.20 if cf != 0 else fval == 0.0
+        # Fallback: contaminated profile mean (best effort)
         profile = db._profiles.get(db.primary_table, {})
         p = profile.get(issue.column, {})
         mean = p.get("mean")
         std  = p.get("std")
         if mean is None or not std or std == 0:
-            return True   # can't compute z — assume resolved
+            return True   # can't compute — assume resolved
         try:
-            z = abs(float(str(new_value)) - mean) / std
-            return z <= 3.0
+            return abs(float(str(new_value)) - mean) / std <= 3.0
         except (ValueError, TypeError):
             return False
 

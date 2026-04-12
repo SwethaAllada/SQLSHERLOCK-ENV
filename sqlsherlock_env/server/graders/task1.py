@@ -5,18 +5,24 @@
 # LICENSE file in the root directory of this source tree.
 
 """
-Task 1 grader — Null and type error repair.
+Task 1 grader — Visualization Prep (Easy).
+
+Intent: visualization
+Issues scored: null, type_error, whitespace, inconsistent_category
 
 Scoring formula:
     task1_score = resolution_score × 0.70 + validation_score × 0.30
-
-Only null and type_error issues contribute to resolution_score.
 """
 
 from server.database import DatabaseEngine
-from server.graders.universal import grade as universal_grade
+from server.graders.universal import (
+    _resolution_score,
+    _false_positive_penalty,
+    _validation_score,
+    _rows_identical,
+)
 
-_ISSUE_FILTER = {"null", "type_error"}
+_ISSUE_FILTER = {"null", "type_error", "whitespace", "inconsistent_category"}
 
 
 def grade(
@@ -36,27 +42,12 @@ def grade(
     Returns:
         Float score in [0.0, 1.0].
     """
-    # universal.grade uses its own 0.60/0.30/0.10 weights internally.
-    # We get the raw universal score, then re-weight to task1 formula:
-    #   resolution_score × 0.70 + validation_score × 0.30
-    #
-    # To do that cleanly we compute both sub-scores independently and
-    # combine them here.
-
-    from server.graders.universal import (
-        _resolution_score,
-        _false_positive_penalty,
-        _trap_penalty,
-        _validation_score,
-    )
-
     issue_registry = db.issue_registry
     scored_issues = [i for i in issue_registry if i.issue_type in _ISSUE_FILTER]
     pk_col = db.pk_col
 
     # Zero-change guard — compare against ORIGINAL dirty state, not current state
     dirty_rows = db.original_state()
-    from server.graders.universal import _rows_identical
     if not removed_ids and _rows_identical(cleaned_rows, dirty_rows, pk_col):
         if db.total_issues > 0:
             return 0.0

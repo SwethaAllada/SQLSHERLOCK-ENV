@@ -28,42 +28,119 @@ from server.validator import Validator
 # Task catalogue
 # ---------------------------------------------------------------------------
 
-TASKS: list[dict] = [
-    {
-        "id":          "task1_null_and_types",
-        "name":        "Null and type error repair",
-        "difficulty":  "easy",
-        "max_steps":   30,
-        "description": (
-            "Find and fix null values and type errors in the primary table. "
-            "Profile columns, identify anomalies, fix with reasoning, "
-            "validate your work, and export the cleaned dataset."
-        ),
-    },
-    {
-        "id":          "task2_constraints_and_fk",
-        "name":        "Constraint and FK integrity",
-        "difficulty":  "medium",
-        "max_steps":   40,
-        "description": (
-            "Everything in Task 1 plus constraint violations "
-            "(negative values in must-be-positive columns) and FK "
-            "violations (orphan references in related tables)."
-        ),
-    },
-    {
-        "id":          "task3_full_audit_with_trap",
-        "name":        "Full statistical audit with trap",
-        "difficulty":  "hard",
-        "max_steps":   50,
-        "description": (
-            "Full audit including statistical outliers. TRAP WARNING: "
-            "one numeric value looks suspicious but is legitimate. "
-            "You MUST check z-scores before fixing any numeric value. "
-            "z > 5 = real outlier. z < 3 = leave alone."
-        ),
-    },
-]
+def _make_tasks() -> list[dict]:
+    """Build the 9-task catalogue: 3 intents × 3 difficulty levels."""
+
+    _TRAP_NOTE = (
+        " TRAP WARNING: one numeric value looks suspicious but has z < 3 "
+        "(statistically legitimate). ALWAYS verify z-scores before fixing numeric "
+        "values. z > 5 = real outlier to fix. z < 3 = leave alone."
+    )
+
+    return [
+        # ── Visualization ──────────────────────────────────────────────────
+        {
+            "id": "viz_easy", "intent": "visualization",
+            "difficulty": "easy", "max_steps": 30,
+            "name": "Visualization Prep — Easy",
+            "correct_intent": "visualization",
+            "description": (
+                "Prepare this dataset for dashboard visualization (Easy). "
+                "Fix null values, type errors, whitespace noise, and inconsistent "
+                "category labels. Goal: every chart cell has a clean, consistent value."
+            ),
+        },
+        {
+            "id": "viz_medium", "intent": "visualization",
+            "difficulty": "medium", "max_steps": 40,
+            "name": "Visualization Prep — Medium",
+            "correct_intent": "visualization",
+            "description": (
+                "Visualization prep — Medium. Fix all Easy issues plus constraint "
+                "violations (negative values where impossible) and statistical "
+                "outliers (z > 5). Goal: no outliers distorting chart scales or axes."
+            ),
+        },
+        {
+            "id": "viz_hard", "intent": "visualization",
+            "difficulty": "hard", "max_steps": 50,
+            "name": "Visualization Prep — Hard",
+            "correct_intent": "visualization",
+            "description": (
+                "Visualization prep — Hard. Full audit: all Medium issues plus "
+                "duplicate rows and FK violations." + _TRAP_NOTE
+            ),
+        },
+        # ── ML Training ────────────────────────────────────────────────────
+        {
+            "id": "ml_easy", "intent": "ml_training",
+            "difficulty": "easy", "max_steps": 30,
+            "name": "ML Model Development — Easy",
+            "correct_intent": "ml_training",
+            "description": (
+                "Prepare this dataset for ML model training (Easy). "
+                "Fix null values, type errors, whitespace, and inconsistent "
+                "category labels. Goal: every feature has a valid, consistent value."
+            ),
+        },
+        {
+            "id": "ml_medium", "intent": "ml_training",
+            "difficulty": "medium", "max_steps": 40,
+            "name": "ML Model Development — Medium",
+            "correct_intent": "ml_training",
+            "description": (
+                "ML training prep — Medium. Fix all Easy issues plus constraint "
+                "violations (negative features) and statistical outliers (z > 5). "
+                "Goal: no corrupted or extreme values biasing model weights."
+            ),
+        },
+        {
+            "id": "ml_hard", "intent": "ml_training",
+            "difficulty": "hard", "max_steps": 50,
+            "name": "ML Model Development — Hard",
+            "correct_intent": "ml_training",
+            "description": (
+                "ML training prep — Hard. Full audit: all Medium issues plus "
+                "duplicate rows and FK violations." + _TRAP_NOTE
+            ),
+        },
+        # ── Business Query ─────────────────────────────────────────────────
+        {
+            "id": "bq_easy", "intent": "business_query",
+            "difficulty": "easy", "max_steps": 30,
+            "name": "Business Analytics Query — Easy",
+            "correct_intent": "business_query",
+            "description": (
+                "Prepare this dataset for business SQL analytics (Easy). "
+                "Fix null values, type errors, whitespace, and inconsistent "
+                "category labels. Goal: clean data for accurate GROUP BY queries."
+            ),
+        },
+        {
+            "id": "bq_medium", "intent": "business_query",
+            "difficulty": "medium", "max_steps": 40,
+            "name": "Business Analytics Query — Medium",
+            "correct_intent": "business_query",
+            "description": (
+                "Business analytics prep — Medium. Fix all Easy issues plus "
+                "constraint violations and statistical outliers. "
+                "Goal: consistent, valid values for JOIN and aggregation."
+            ),
+        },
+        {
+            "id": "bq_hard", "intent": "business_query",
+            "difficulty": "hard", "max_steps": 50,
+            "name": "Business Analytics Query — Hard",
+            "correct_intent": "business_query",
+            "description": (
+                "Business analytics prep — Hard. Full audit: all Medium issues "
+                "plus FK violations and duplicate rows." + _TRAP_NOTE
+            ),
+        },
+    ]
+
+
+TASKS: list[dict] = _make_tasks()
 
 _TASK_MAP: dict[str, dict] = {t["id"]: t for t in TASKS}
 
@@ -83,6 +160,8 @@ class SQLSherlockEnvironment(Environment):
         self._reward_trace: list[dict] = []
         self._validation_called: bool = False
         self._export_result: Optional[dict] = None
+        self._intent: Optional[str] = None           # user-provided or task-hidden intent
+        self._correct_intent: Optional[str] = None  # grader-known correct intent (task4)
 
     # ------------------------------------------------------------------
     # reset()
@@ -100,10 +179,11 @@ class SQLSherlockEnvironment(Environment):
         Raises:
             ValueError: If dataset or task_id is missing/invalid.
         """
-        dataset  = kwargs.get("dataset", "") or "phihung/titanic"
-        task_id  = kwargs.get("task_id", "") or "task1_null_and_types"
-        seed     = int(kwargs.get("seed", 42))
-        max_rows = int(kwargs.get("max_rows", 500))
+        dataset       = kwargs.get("dataset", "") or "phihung/titanic"
+        task_id       = kwargs.get("task_id", "") or "viz_easy"
+        seed          = int(kwargs.get("seed", 42))
+        max_rows      = int(kwargs.get("max_rows", 500))
+        output_format = kwargs.get("output_format", None)
         if task_id not in _TASK_MAP:
             raise ValueError(
                 f"Unknown task_id '{task_id}'. "
@@ -112,6 +192,17 @@ class SQLSherlockEnvironment(Environment):
 
         task_cfg = _TASK_MAP[task_id]
 
+        # Intent: explicit kwarg overrides task default; task config defines correct intent
+        raw_intent = kwargs.get("intent", None)
+        task_intent = task_cfg.get("intent")   # always set for our 3 tasks
+        self._intent: Optional[str] = (
+            raw_intent.strip().lower() if isinstance(raw_intent, str) and raw_intent.strip()
+            else task_intent
+        )
+        self._correct_intent: Optional[str] = task_cfg.get("correct_intent")
+        # For task4, if no explicit intent was given, we use the hidden correct intent
+        # as the internal ground truth (not shown in obs) to score classify_intent.
+
         # Fresh database for this episode
         self._db = DatabaseEngine(
             task_id=task_id,
@@ -119,6 +210,8 @@ class SQLSherlockEnvironment(Environment):
             dataset_source=dataset,
             max_rows=max_rows,
         )
+        # Share intent with database engine so graders can access it
+        self._db._intent = self._intent or self._correct_intent
 
         self._state = SQLSherlockState(
             episode_id=str(uuid.uuid4()),
@@ -130,6 +223,10 @@ class SQLSherlockEnvironment(Environment):
             source_format=self._db.source_format,
             investigation_count=0,
             validation_called=False,
+            intent=self._intent,
+            tables_selected=[],
+            joins_performed=0,
+            output_format=output_format,
         )
 
         self._counter = InvestCounter()
@@ -288,6 +385,82 @@ class SQLSherlockEnvironment(Environment):
                     f"Issues remaining: {self._db.issues_remaining()}."
                 )
 
+            # ------------------------------------------------------------------
+            # select_tables — declare active tables for multi-table analysis
+            # ------------------------------------------------------------------
+            elif atype == "select_tables":
+                requested = list(action.tables or [])
+                available = self._db.table_names()
+                valid   = [t for t in requested if t in available]
+                invalid = [t for t in requested if t not in available]
+                self._state.tables_selected = valid
+                if invalid:
+                    feedback = (
+                        f"select_tables: WARNING — tables not found: {invalid}. "
+                        f"Selected valid tables: {valid}. "
+                        f"All available: {available}."
+                    )
+                elif not valid:
+                    feedback = (
+                        f"select_tables: no tables specified. "
+                        f"Available tables: {available}."
+                    )
+                else:
+                    feedback = (
+                        f"select_tables: selected {len(valid)} table(s): {valid}. "
+                        f"Use join_tables to combine them."
+                    )
+
+            # ------------------------------------------------------------------
+            # join_tables — join two tables on a matching key
+            # ------------------------------------------------------------------
+            elif atype == "join_tables":
+                t1  = action.table or self._db.primary_table
+                t2  = action.table2
+                key = action.key
+                if not t2:
+                    raise ValueError("join_tables requires 'table2' field.")
+                if not key:
+                    raise ValueError("join_tables requires 'key' field.")
+                join_result = self._db.join_tables(t1, t2, key)
+                query_result = join_result["rows"]
+                self._state.joins_performed += 1
+                status = "VALID" if join_result["valid"] else "INVALID"
+                feedback = (
+                    f"join_tables: {t1} LEFT JOIN {t2} ON '{key}' [{status}]. "
+                    f"Returned {len(query_result)} rows. "
+                    f"Match rate: {join_result['match_rate']:.1%}."
+                    + (f" Error: {join_result['error']}" if join_result["error"] else "")
+                )
+
+            # ------------------------------------------------------------------
+            # classify_intent — agent declares the inferred cleaning intent
+            # ------------------------------------------------------------------
+            elif atype == "classify_intent":
+                guessed = str(action.value or "").strip().lower()
+                valid_intents = {"visualization", "ml_training", "business_query"}
+                if guessed not in valid_intents:
+                    feedback = (
+                        f"classify_intent: unknown intent '{guessed}'. "
+                        f"Valid values: {sorted(valid_intents)}."
+                    )
+                else:
+                    # Store as the active intent for this episode
+                    if self._intent is None:
+                        self._intent = guessed
+                        self._state.intent = guessed
+                        self._db._intent = guessed
+                    correct = self._correct_intent
+                    if correct is None:
+                        feedback = f"classify_intent: intent set to '{guessed}'."
+                    elif guessed == correct:
+                        feedback = f"classify_intent: correct! Cleaning strategy set to '{guessed}'."
+                    else:
+                        feedback = (
+                            f"classify_intent: classified as '{guessed}'. "
+                            "Consider reviewing the task description for more clues."
+                        )
+
             elif atype == "export":
                 cleaned_rows  = action.cleaned_rows or self._db.current_state()
                 removed_ids   = action.removed_ids or []
@@ -303,6 +476,7 @@ class SQLSherlockEnvironment(Environment):
                     cleaned_rows=cleaned_rows,
                     source_format=self._db.source_format,
                     dataset_name=self._db.dataset_name,
+                    output_format=self._state.output_format if self._state else None,
                 )
                 self._export_result = export_info
                 done = True
@@ -321,6 +495,11 @@ class SQLSherlockEnvironment(Environment):
         # ------------------------------------------------------------------
         # Reward
         # ------------------------------------------------------------------
+        # Determine join_valid for join_tables reward
+        _join_valid: Optional[bool] = None
+        if atype == "join_tables" and self._db._join_attempts:
+            _join_valid = self._db._join_attempts[-1].get("valid")
+
         rb: RB = calc(
             action_type=atype,
             db=self._db,
@@ -329,6 +508,9 @@ class SQLSherlockEnvironment(Environment):
             validation_result=(
                 getattr(self, "_last_vr", None) if atype == "validate" else None
             ),
+            intent=self._intent,
+            correct_intent=self._correct_intent,
+            join_valid=_join_valid,
         )
 
         step_reward = rb.total
@@ -394,4 +576,5 @@ class SQLSherlockEnvironment(Environment):
             last_feedback=last_feedback,
             reward_trace=list(self._reward_trace),
             done=self._state.done if self._state else False,
+            intent=self._intent,  # None for task4 (agent must infer via classify_intent)
         )

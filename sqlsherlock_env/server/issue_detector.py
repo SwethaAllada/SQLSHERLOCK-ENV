@@ -30,20 +30,36 @@ from typing import Any, Optional
 
 SENTINEL_UNKNOWN = "__UNKNOWN__"
 
+# ---------------------------------------------------------------------------
+# Difficulty-level check sets (shared across all intents)
+# ---------------------------------------------------------------------------
+
+_EASY_CHECKS   = ["null", "type_error", "whitespace", "inconsistent_category"]
+_MEDIUM_CHECKS = ["null", "type_error", "whitespace", "inconsistent_category",
+                  "constraint", "outlier"]
+_HARD_CHECKS   = ["null", "type_error", "whitespace", "inconsistent_category",
+                  "constraint", "outlier", "duplicate", "fk_violation"]
+
 MINIMUM_ISSUES: dict[str, int] = {
-    "task1_null_and_types":         3,
-    "task2_constraints_and_fk":     5,
-    "task3_full_audit_with_trap":   7,
+    # visualization intent
+    "viz_easy":   3,  "viz_medium":  5,  "viz_hard":   7,
+    # ml_training intent
+    "ml_easy":    3,  "ml_medium":   5,  "ml_hard":    7,
+    # business_query intent
+    "bq_easy":    3,  "bq_medium":   5,  "bq_hard":    7,
 }
 
-# Which checks run per task
+# Which checks run per task (all hard tasks get the full audit)
 TASK_CHECKS: dict[str, list[str]] = {
-    "task1_null_and_types":       ["null", "type_error"],
-    "task2_constraints_and_fk":   ["null", "type_error", "constraint", "fk_violation",
-                                   "whitespace", "inconsistent_category"],
-    "task3_full_audit_with_trap": ["null", "type_error", "constraint",
-                                   "fk_violation", "outlier", "duplicate",
-                                   "whitespace", "inconsistent_category"],
+    "viz_easy":    _EASY_CHECKS,
+    "ml_easy":     _EASY_CHECKS,
+    "bq_easy":     _EASY_CHECKS,
+    "viz_medium":  _MEDIUM_CHECKS,
+    "ml_medium":   _MEDIUM_CHECKS,
+    "bq_medium":   _MEDIUM_CHECKS,
+    "viz_hard":    _HARD_CHECKS,
+    "ml_hard":     _HARD_CHECKS,
+    "bq_hard":     _HARD_CHECKS,
 }
 
 OUTLIER_Z_THRESHOLD = 5.0

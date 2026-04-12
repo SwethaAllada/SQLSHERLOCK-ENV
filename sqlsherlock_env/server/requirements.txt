@@ -7,3 +7,5 @@ python-multipart>=0.0.9
 datasets>=2.20.0
 pandas>=2.0.0
 pyarrow>=14.0.0
+gradio>=4.44.0
+scikit-learn>=1.4.0

@@ -40,13 +40,13 @@ def env():
 
 @pytest.fixture
 def env_task1(env):
-    env.reset(dataset=RAW_CSV_TEXT, task_id="task1_null_and_types")
+    env.reset(dataset=RAW_CSV_TEXT, task_id="viz_easy")
     return env
 
 
 @pytest.fixture
 def env_task3(env):
-    env.reset(dataset=RAW_CSV_TEXT, task_id="task3_full_audit_with_trap")
+    env.reset(dataset=RAW_CSV_TEXT, task_id="viz_hard")
     return env
 
 
@@ -55,27 +55,44 @@ def env_task3(env):
 # ---------------------------------------------------------------------------
 
 class TestTasksCatalogue:
-    def test_three_tasks_defined(self):
-        assert len(TASKS) == 3
+    def test_nine_tasks_defined(self):
+        assert len(TASKS) == 9
 
-    def test_task_ids_correct(self):
+    def test_all_task_ids_present(self):
         ids = {t["id"] for t in TASKS}
         assert ids == {
-            "task1_null_and_types",
-            "task2_constraints_and_fk",
-            "task3_full_audit_with_trap",
+            "viz_easy", "viz_medium", "viz_hard",
+            "ml_easy",  "ml_medium",  "ml_hard",
+            "bq_easy",  "bq_medium",  "bq_hard",
         }
 
     def test_tasks_have_required_fields(self):
         for t in TASKS:
-            for field in ("id", "name", "difficulty", "max_steps", "description"):
+            for field in ("id", "name", "difficulty", "max_steps", "description", "intent"):
                 assert field in t, f"Task missing field '{field}': {t}"
 
-    def test_max_steps_values(self):
-        step_map = {t["id"]: t["max_steps"] for t in TASKS}
-        assert step_map["task1_null_and_types"]       == 30
-        assert step_map["task2_constraints_and_fk"]   == 40
-        assert step_map["task3_full_audit_with_trap"] == 50
+    def test_max_steps_by_difficulty(self):
+        for t in TASKS:
+            if t["difficulty"] == "easy":
+                assert t["max_steps"] == 30, t["id"]
+            elif t["difficulty"] == "medium":
+                assert t["max_steps"] == 40, t["id"]
+            elif t["difficulty"] == "hard":
+                assert t["max_steps"] == 50, t["id"]
+
+    def test_three_intents_each_have_three_tasks(self):
+        from collections import Counter
+        intent_counts = Counter(t["intent"] for t in TASKS)
+        assert intent_counts["visualization"]  == 3
+        assert intent_counts["ml_training"]    == 3
+        assert intent_counts["business_query"] == 3
+
+    def test_three_difficulties_each_appear_three_times(self):
+        from collections import Counter
+        diff_counts = Counter(t["difficulty"] for t in TASKS)
+        assert diff_counts["easy"]   == 3
+        assert diff_counts["medium"] == 3
+        assert diff_counts["hard"]   == 3
 
 
 # ---------------------------------------------------------------------------
@@ -84,29 +101,29 @@ class TestTasksCatalogue:
 
 class TestReset:
     def test_reset_returns_observation(self, env):
-        obs = env.reset(dataset=RAW_CSV_TEXT, task_id="task1_null_and_types")
+        obs = env.reset(dataset=RAW_CSV_TEXT, task_id="viz_easy")
         assert isinstance(obs, SQLSherlockObservation)
 
     def test_reset_populates_tables_summary(self, env):
-        obs = env.reset(dataset=RAW_CSV_TEXT, task_id="task1_null_and_types")
+        obs = env.reset(dataset=RAW_CSV_TEXT, task_id="viz_easy")
         assert len(obs.tables_summary) > 0
 
     def test_reset_task_description_set(self, env):
-        obs = env.reset(dataset=RAW_CSV_TEXT, task_id="task2_constraints_and_fk")
-        assert "Task" in obs.task_description or len(obs.task_description) > 0
+        obs = env.reset(dataset=RAW_CSV_TEXT, task_id="ml_medium")
+        assert len(obs.task_description) > 0
 
     def test_reset_step_zero(self, env):
-        obs = env.reset(dataset=RAW_CSV_TEXT, task_id="task1_null_and_types")
+        obs = env.reset(dataset=RAW_CSV_TEXT, task_id="viz_easy")
         assert obs.step == 0
 
     def test_reset_no_dataset_uses_default(self, env):
         """Empty dataset defaults to phihung/titanic."""
-        obs = env.reset(dataset="", task_id="task1_null_and_types")
+        obs = env.reset(dataset="", task_id="viz_easy")
         assert isinstance(obs, SQLSherlockObservation)
         assert len(obs.tables_summary) > 0
 
     def test_reset_no_task_uses_default(self, env):
-        """Empty task_id defaults to task1_null_and_types."""
+        """Empty task_id defaults to viz_easy."""
         obs = env.reset(dataset=RAW_CSV_TEXT, task_id="")
         assert isinstance(obs, SQLSherlockObservation)
 
@@ -115,11 +132,10 @@ class TestReset:
             env.reset(dataset=RAW_CSV_TEXT, task_id="task99_bad")
 
     def test_reset_clears_reward_trace(self, env):
-        env.reset(dataset=RAW_CSV_TEXT, task_id="task1_null_and_types")
+        env.reset(dataset=RAW_CSV_TEXT, task_id="viz_easy")
         env.step(SQLSherlockAction(action_type="inspect",
                                    table=list(env._db.table_names())[0]))
-        # Second reset should clear trace
-        obs = env.reset(dataset=RAW_CSV_TEXT, task_id="task1_null_and_types")
+        obs = env.reset(dataset=RAW_CSV_TEXT, task_id="viz_easy")
         assert obs.reward_trace == []
 
     def test_reset_before_step_raises(self, env):
@@ -391,7 +407,7 @@ class TestRewardTrace:
 
 class TestMaxSteps:
     def test_done_at_max_steps(self, env):
-        env.reset(dataset=RAW_CSV_TEXT, task_id="task1_null_and_types")
+        env.reset(dataset=RAW_CSV_TEXT, task_id="viz_easy")
         table = list(env._db.table_names())[0]
         done = False
         for _ in range(35):   # more than max_steps=30
@@ -414,7 +430,7 @@ class TestGetState:
 
     def test_get_state_task_id(self, env_task1):
         state = env_task1.get_state()
-        assert state.task_id == "task1_null_and_types"
+        assert state.task_id == "viz_easy"
 
     def test_get_state_step_count_increments(self, env_task1):
         table = list(env_task1._db.table_names())[0]
@@ -448,3 +464,127 @@ class TestWebSocketActionMinimal:
         action = SQLSherlockAction(action_type="submit")
         obs, reward, done, _ = _step(env_task1, action)
         assert done is True
+
+
+# ---------------------------------------------------------------------------
+# Intent-aware reset
+# ---------------------------------------------------------------------------
+
+class TestIntentAwareReset:
+    def test_viz_tasks_have_visualization_intent(self, env):
+        for tid in ("viz_easy", "viz_medium", "viz_hard"):
+            obs = env.reset(dataset=RAW_CSV_TEXT, task_id=tid)
+            assert obs.intent == "visualization", tid
+
+    def test_ml_tasks_have_ml_training_intent(self, env):
+        for tid in ("ml_easy", "ml_medium", "ml_hard"):
+            obs = env.reset(dataset=RAW_CSV_TEXT, task_id=tid)
+            assert obs.intent == "ml_training", tid
+
+    def test_bq_tasks_have_business_query_intent(self, env):
+        for tid in ("bq_easy", "bq_medium", "bq_hard"):
+            obs = env.reset(dataset=RAW_CSV_TEXT, task_id=tid)
+            assert obs.intent == "business_query", tid
+
+    def test_explicit_intent_overrides_task_default(self, env):
+        obs = env.reset(dataset=RAW_CSV_TEXT, task_id="viz_easy", intent="ml_training")
+        assert obs.intent == "ml_training"
+
+    def test_state_stores_intent(self, env):
+        env.reset(dataset=RAW_CSV_TEXT, task_id="ml_medium")
+        state = env.get_state()
+        assert state.intent == "ml_training"
+
+    def test_classify_intent_correct_gives_positive_reward(self, env):
+        env.reset(dataset=RAW_CSV_TEXT, task_id="viz_easy")
+        obs, reward, done, _ = _step(env,
+            SQLSherlockAction(action_type="classify_intent", value="visualization")
+        )
+        assert reward >= 0.0
+
+    def test_classify_intent_wrong_gives_negative_reward(self, env):
+        env.reset(dataset=RAW_CSV_TEXT, task_id="viz_easy")
+        obs, reward, done, _ = _step(env,
+            SQLSherlockAction(action_type="classify_intent", value="ml_training")
+        )
+        assert reward < 0.0
+
+    def test_hard_tasks_have_trap(self, env):
+        for tid in ("viz_hard", "ml_hard", "bq_hard"):
+            env.reset(dataset=RAW_CSV_TEXT, task_id=tid)
+            assert env._db.trap is not None, f"No trap in {tid}"
+
+    def test_easy_medium_tasks_have_no_trap(self, env):
+        for tid in ("viz_easy", "viz_medium", "ml_easy", "ml_medium", "bq_easy", "bq_medium"):
+            env.reset(dataset=RAW_CSV_TEXT, task_id=tid)
+            assert env._db.trap is None, f"Unexpected trap in {tid}"
+
+
+# ---------------------------------------------------------------------------
+# select_tables
+# ---------------------------------------------------------------------------
+
+class TestSelectTables:
+    def test_select_tables_valid(self, env_task1):
+        table = list(env_task1._db.table_names())[0]
+        obs, reward, done, _ = _step(env_task1,
+            SQLSherlockAction(action_type="select_tables", tables=[table])
+        )
+        assert not done
+        assert reward >= 0  # investigation-type reward
+
+    def test_select_tables_invalid_table_gives_warning(self, env_task1):
+        obs, reward, done, _ = _step(env_task1,
+            SQLSherlockAction(action_type="select_tables", tables=["nonexistent_table"])
+        )
+        assert "not found" in obs.last_feedback.lower() or "warning" in obs.last_feedback.lower()
+
+    def test_select_tables_updates_state(self, env_task1):
+        table = list(env_task1._db.table_names())[0]
+        env_task1.step(SQLSherlockAction(action_type="select_tables", tables=[table]))
+        state = env_task1.get_state()
+        assert table in state.tables_selected
+
+
+# ---------------------------------------------------------------------------
+# join_tables
+# ---------------------------------------------------------------------------
+
+class TestJoinTables:
+    def test_join_nonexistent_table_gives_error_feedback(self, env_task1):
+        table = list(env_task1._db.table_names())[0]
+        obs, reward, done, _ = _step(env_task1,
+            SQLSherlockAction(
+                action_type="join_tables",
+                table=table,
+                table2="nonexistent_table",
+                key="id",
+            )
+        )
+        assert reward <= 0
+        assert "invalid" in obs.last_feedback.lower() or "error" in obs.last_feedback.lower()
+
+    def test_join_tables_missing_table2_raises(self, env_task1):
+        obs, reward, done, _ = _step(env_task1,
+            SQLSherlockAction(action_type="join_tables", table="t1", key="id")
+        )
+        assert "error" in obs.last_feedback.lower() or "requires" in obs.last_feedback.lower()
+
+    def test_join_tables_missing_key_raises(self, env_task1):
+        table = list(env_task1._db.table_names())[0]
+        obs, reward, done, _ = _step(env_task1,
+            SQLSherlockAction(
+                action_type="join_tables",
+                table=table, table2=table,
+            )
+        )
+        assert "error" in obs.last_feedback.lower() or "requires" in obs.last_feedback.lower()
+
+    def test_join_tables_increments_joins_performed(self, env_task1):
+        table = list(env_task1._db.table_names())[0]
+        env_task1.step(SQLSherlockAction(
+            action_type="join_tables",
+            table=table, table2="nonexistent", key="id",
+        ))
+        state = env_task1.get_state()
+        assert state.joins_performed == 1

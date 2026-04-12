@@ -219,16 +219,39 @@ def _resolve_issue(
         val = row.get(col)
         if _is_null(val):
             return 0.0
-        if col_mean is None or col_std is None or col_std == 0:
-            return C   # can't verify — assume resolved
         try:
-            z = abs(float(str(val)) - col_mean) / col_std
+            fval = float(str(val))
         except (ValueError, TypeError):
             return 0.0
-        if z <= 3.0:
-            return C
-        if z <= 5.0:
-            return C * 0.5
+
+        # Primary check: new value is close to the stored correct (column median).
+        # The median is set at detection time from clean values — not contaminated.
+        correct = iss.correct
+        if correct is not None and correct != SENTINEL_UNKNOWN:
+            try:
+                cf = float(str(correct))
+                if _values_match(fval, cf):
+                    return C   # exact match to median → fully resolved
+                # Accept any value within 2× std of the stored median
+                if col_std is not None and col_std > 0:
+                    z_from_median = abs(fval - cf) / col_std
+                    if z_from_median <= 2.0:
+                        return C        # close to median
+                    if z_from_median <= 4.0:
+                        return C * 0.7  # reasonable but not ideal
+            except (ValueError, TypeError):
+                pass
+
+        # Fallback: z-score from profile mean (may be contaminated; best-effort)
+        if col_mean is not None and col_std is not None and col_std > 0:
+            try:
+                z = abs(fval - col_mean) / col_std
+                if z <= 3.0:
+                    return C
+                if z <= 5.0:
+                    return C * 0.5
+            except (ValueError, TypeError):
+                pass
         return 0.0
 
     # --- whitespace ---
@@ -302,7 +325,7 @@ def _false_positive_penalty(
     wrongly_removed = orig_ids - cleaned_ids - issue_rows
     fp_count += len(wrongly_removed)
 
-    return min(fp_count * 0.05, 0.20)
+    return min(fp_count * 0.05, 0.35)
 
 
 def _trap_penalty(
@@ -313,7 +336,7 @@ def _trap_penalty(
     task_id: str,
 ) -> float:
     """Return 0.40 if the agent touched the trap cell, else 0.0."""
-    if task_id != "task3_full_audit_with_trap":
+    if not task_id.endswith("_hard"):
         return 0.0
     trap = db.trap
     if trap is None:
@@ -357,7 +380,7 @@ def _validation_score(
         score = 0.0
 
     if not validation_was_called and db.total_issues > 0:
-        score *= 0.70   # penalty for skipping validate()
+        score *= 0.50   # penalty for skipping validate()
 
     return round(score, 4)
 
@@ -367,8 +390,8 @@ def _reasoning_bonus(
     task_id: str,
     validation_was_called: bool,
 ) -> float:
-    """Return 0.05 if task3 agent used statistical reasoning, else 0.0."""
-    if task_id != "task3_full_audit_with_trap":
+    """Return 0.05 if hard-level agent used statistical reasoning, else 0.0."""
+    if not task_id.endswith("_hard"):
         return 0.0
     if not validation_was_called:
         return 0.0

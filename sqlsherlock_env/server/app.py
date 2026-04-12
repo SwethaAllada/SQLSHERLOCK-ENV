@@ -12,6 +12,7 @@ Mounts the OpenEnv core WebSocket/HTTP app and adds extra endpoints:
   GET  /tasks
   POST /upload_dataset
   GET  /download/{file_id}
+  /    Gradio dashboard UI (if gradio is installed)
 """
 
 import os
@@ -37,6 +38,7 @@ app: FastAPI = create_app(
     SQLSherlockObservation,
     env_name="sqlsherlock_env",
 )
+
 
 # ---------------------------------------------------------------------------
 # /health
@@ -86,12 +88,12 @@ async def upload_dataset(file: UploadFile = File(...)) -> dict:
     filename = file.filename or "upload"
     suffix   = Path(filename).suffix.lower()
 
-    if suffix not in (".csv", ".json", ".jsonl", ".parquet"):
+    if suffix not in (".csv", ".json", ".jsonl", ".parquet", ".xlsx"):
         raise HTTPException(
             status_code=400,
             detail=(
                 f"Unsupported file type '{suffix}'. "
-                "Upload a .csv, .json, .jsonl, or .parquet file."
+                "Upload a .csv, .json, .jsonl, .parquet, or .xlsx file."
             ),
         )
 
@@ -129,7 +131,7 @@ async def upload_dataset(file: UploadFile = File(...)) -> dict:
         "detected_issues_preview":  issue_preview,
         "usage_example": (
             f'{{"dataset": "{filename}", '
-            f'"task_id": "task1_null_and_types"}}'
+            f'"task_id": "task1_visualization_prep"}}'
         ),
     }
 
@@ -160,6 +162,20 @@ async def download_file(file_id: str) -> FileResponse:
         filename=filename,
         media_type="application/octet-stream",
     )
+
+
+# ---------------------------------------------------------------------------
+# Gradio dashboard — mounted AFTER all API routes so it acts as fallback
+# ---------------------------------------------------------------------------
+
+try:
+    import gradio as gr
+    from server.ui import create_ui
+
+    _gradio_app = create_ui()
+    app = gr.mount_gradio_app(app, _gradio_app, path="/")
+except ImportError:
+    pass  # gradio not installed — API-only mode
 
 
 # ---------------------------------------------------------------------------

@@ -27,10 +27,20 @@ from server.graders.task1 import grade as _grade_task1
 from server.graders.task2 import grade as _grade_task2
 from server.graders.task3 import grade as _grade_task3
 
+# 9 task IDs: 3 intents × 3 difficulty levels
 _GRADERS = {
-    "task1_null_and_types":         _grade_task1,
-    "task2_constraints_and_fk":     _grade_task2,
-    "task3_full_audit_with_trap":   _grade_task3,
+    # Easy tasks (any intent) → easy grader
+    "viz_easy":    _grade_task1,
+    "ml_easy":     _grade_task1,
+    "bq_easy":     _grade_task1,
+    # Medium tasks (any intent) → medium grader
+    "viz_medium":  _grade_task2,
+    "ml_medium":   _grade_task2,
+    "bq_medium":   _grade_task2,
+    # Hard tasks (any intent) → hard grader
+    "viz_hard":    _grade_task3,
+    "ml_hard":     _grade_task3,
+    "bq_hard":     _grade_task3,
 }
 
 

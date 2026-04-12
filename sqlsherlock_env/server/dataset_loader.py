@@ -51,6 +51,24 @@ def load(source: str, max_rows: int = 500) -> dict[str, list[dict]]:
     source = source.strip()
 
     # Dispatch to loader
+    # xlsx multi-sheet: load ALL sheets as separate tables
+    if _is_local_file(source) and source.lower().endswith(".xlsx"):
+        sheets = _load_xlsx_sheets(source, max_rows)
+        result = {}
+        for sheet_name, recs in sheets.items():
+            try:
+                _validate_records(recs)
+            except ValueError:
+                continue  # skip empty/tiny sheets
+            recs = _ensure_id_column(recs)
+            recs = coerce(recs)
+            for row in recs:
+                row["_source_format"] = "csv"
+            result[_sanitise_name(sheet_name)] = recs
+        if not result:
+            raise ValueError("No usable sheets found in the Excel file.")
+        return result
+
     if _is_local_file(source):
         records, fmt = _load_local(source, max_rows)
     elif _is_hf_dataset(source):
@@ -60,7 +78,7 @@ def load(source: str, max_rows: int = 500) -> dict[str, list[dict]]:
     else:
         raise ValueError(
             f"Unrecognised source '{source}'. "
-            "Provide a file path (.csv/.json/.jsonl/.parquet), "
+            "Provide a file path (.csv/.json/.jsonl/.parquet/.xlsx), "
             "a HuggingFace dataset name (owner/name), "
             "or raw CSV text."
         )
@@ -182,10 +200,12 @@ def _load_local(path: str, max_rows: int) -> tuple[list[dict], str]:
         return _load_jsonl_file(p, max_rows), "jsonl"
     elif suffix == ".parquet":
         return _load_parquet_file(p, max_rows), "parquet"
+    elif suffix == ".xlsx":
+        return _load_xlsx_file(p, max_rows), "csv"
     else:
         raise ValueError(
             f"Unsupported file extension '{suffix}'. "
-            "Use .csv, .json, .jsonl, or .parquet."
+            "Use .csv, .json, .jsonl, .parquet, or .xlsx."
         )
 
 
@@ -236,6 +256,46 @@ def _load_parquet_file(path: Path, max_rows: int) -> list[dict]:
     df = pd.read_parquet(path)
     df = df.head(max_rows)
     return _df_to_records(df)
+
+
+def _load_xlsx_file(path: Path, max_rows: int) -> list[dict]:
+    """Load the FIRST sheet of an Excel file. Use _load_xlsx_sheets for multi-sheet."""
+    sheets = _load_xlsx_sheets(str(path), max_rows)
+    if not sheets:
+        raise ValueError(f"Excel file '{path}' contains no readable sheets.")
+    return next(iter(sheets.values()))
+
+
+def _load_xlsx_sheets(path: str, max_rows: int) -> dict[str, list[dict]]:
+    """Load ALL sheets from an Excel file, returning {sheet_name: records}."""
+    try:
+        import openpyxl
+    except ImportError:
+        raise ValueError(
+            "openpyxl is required to load Excel files. pip install openpyxl"
+        )
+
+    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    result = {}
+
+    for sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
+        rows = list(ws.iter_rows(values_only=True))
+        if not rows:
+            continue
+
+        # First row is the header
+        headers = [str(h) if h is not None else f"col_{i}" for i, h in enumerate(rows[0])]
+        records = []
+        for row in rows[1: max_rows + 1]:
+            record = {headers[i]: row[i] for i in range(len(headers))}
+            records.append(record)
+
+        if records:
+            result[sheet_name] = records
+
+    wb.close()
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -372,7 +432,8 @@ def _sanitise_name(name: str) -> str:
 
 
 def _is_local_file(source: str) -> bool:
-    return any(source.lower().endswith(ext) for ext in (".csv", ".json", ".jsonl", ".parquet"))
+    return any(source.lower().endswith(ext)
+               for ext in (".csv", ".json", ".jsonl", ".parquet", ".xlsx"))
 
 
 def _is_hf_dataset(source: str) -> bool:

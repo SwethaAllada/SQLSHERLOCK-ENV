@@ -20,7 +20,7 @@ import json
 import os
 import tempfile
 import uuid
-from typing import Any
+from typing import Any, Optional
 
 
 # ---------------------------------------------------------------------------
@@ -31,6 +31,7 @@ def export_cleaned(
     cleaned_rows: list[dict],
     source_format: str,
     dataset_name: str,
+    output_format: Optional[str] = None,
 ) -> dict:
     """Write cleaned rows to a temp file matching the original format.
 
@@ -55,7 +56,11 @@ def export_cleaned(
 
     file_id  = str(uuid.uuid4())
     stem     = _stem_from_name(dataset_name)
-    fmt      = source_format if source_format in _WRITERS else "csv"
+    # output_format overrides source_format (user can request csv/json/parquet)
+    fmt      = (
+        output_format if output_format and output_format in _WRITERS
+        else (source_format if source_format in _WRITERS else "csv")
+    )
 
     filename, filepath = _make_temp_path(file_id, stem, fmt)
 
