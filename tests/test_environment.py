@@ -352,12 +352,12 @@ class TestStepSubmit:
         )
         assert done is True
 
-    def test_submit_with_open_issues_negative_reward(self, env_task1):
+    def test_submit_with_open_issues_low_reward(self, env_task1):
         _, reward, _, _ = _step(env_task1,
             SQLSherlockAction(action_type="submit")
         )
-        # Issues still open -> negative reward
-        assert reward < 0
+        # Submit reward = grader score in (0.01, 0.99); no fixes → score near 0.01
+        assert 0.0 < reward < 1.0
 
 
 # ---------------------------------------------------------------------------

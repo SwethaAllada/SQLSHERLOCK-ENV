@@ -514,6 +514,12 @@ class SQLSherlockEnvironment(Environment):
         )
 
         step_reward = rb.total
+        # For submit/export (done=true steps): use grader score as the step reward.
+        # Grader score is already in (0.01, 0.99), satisfying the hackathon requirement
+        # that each task's score must be strictly between 0 and 1.
+        if atype in ("submit", "export") and self._state is not None:
+            step_reward = self._state.grader_score
+
         rb_dict = rb.to_dict()
         rb_dict["step"] = step
         rb_dict["action_type"] = atype

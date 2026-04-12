@@ -72,12 +72,16 @@ def grade(
             f"Unknown task_id '{task_id}'. "
             f"Valid tasks: {sorted(_GRADERS.keys())}"
         )
-    return grader_fn(
+    raw = grader_fn(
         db=db,
         cleaned_rows=cleaned_rows,
         removed_ids=removed_ids,
         validation_was_called=validation_was_called,
     )
+    # Scale internal [0.0, 1.0] → (0.01, 0.99) so the score is strictly between
+    # 0 and 1 as required by the OpenEnv hackathon validation.
+    # 0.0 (zero-change) → 0.01;  1.0 (perfect) → 0.99.
+    return round(0.01 + raw * 0.98, 4)
 
 
 __all__ = ["grade"]

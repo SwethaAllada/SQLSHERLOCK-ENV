@@ -114,7 +114,8 @@ class TestZeroChangeGuard:
             task_id="viz_easy",
             validation_was_called=False,
         )
-        assert score == 0.0
+        # Zero-change guard → internal 0.0 → scaled to 0.01; must be strictly > 0
+        assert 0.0 < score <= 0.02
 
     def test_zero_change_no_issues_returns_nonzero(self):
         """If there are genuinely no issues, returning dirty rows is acceptable."""
@@ -139,7 +140,8 @@ class TestTask1Grader:
             task_id="viz_easy",
             validation_was_called=True,
         )
-        assert score >= 0.60, f"Expected >= 0.60 after full fix, got {score}"
+        # 0.60 on old [0,1] scale → ~0.598 on (0.01, 0.99) scale
+        assert score >= 0.59, f"Expected >= 0.59 after full fix, got {score}"
 
     def test_no_fix_scores_zero(self, db_task1):
         dirty = _current(db_task1)
@@ -150,7 +152,8 @@ class TestTask1Grader:
             task_id="viz_easy",
             validation_was_called=False,
         )
-        assert score == 0.0
+        # Zero-change: internal 0.0 scaled to 0.01; must be strictly > 0
+        assert 0.0 < score <= 0.02
 
     def test_score_in_range(self, db_task1):
         cleaned = _apply_all_fixes(db_task1)
@@ -161,7 +164,7 @@ class TestTask1Grader:
             task_id="viz_easy",
             validation_was_called=True,
         )
-        assert 0.0 <= score <= 1.0
+        assert 0.0 < score < 1.0
 
     def test_no_validate_penalty(self, db_task1):
         cleaned = _apply_all_fixes(db_task1)
@@ -211,7 +214,7 @@ class TestTask2Grader:
             task_id="ml_medium",
             validation_was_called=True,
         )
-        assert 0.0 <= score <= 1.0
+        assert 0.0 < score < 1.0
 
     def test_task2_score_leq_task1_on_same_fixes(self, db_task1, db_task2):
         """task2 weight means full fix may score differently — both must be in range."""
@@ -219,8 +222,8 @@ class TestTask2Grader:
         c2 = _apply_all_fixes(db_task2)
         s1 = graders.grade(db_task1, c1, [], "viz_easy",     True)
         s2 = graders.grade(db_task2, c2, [], "ml_medium", True)
-        assert 0.0 <= s1 <= 1.0
-        assert 0.0 <= s2 <= 1.0
+        assert 0.0 < s1 < 1.0
+        assert 0.0 < s2 < 1.0
 
 
 # ---------------------------------------------------------------------------
@@ -237,7 +240,7 @@ class TestTask3Grader:
             task_id="bq_hard",
             validation_was_called=True,
         )
-        assert 0.0 <= score <= 1.0
+        assert 0.0 < score < 1.0
 
     def test_trap_penalty_applied(self, db_task3):
         """Touching the trap cell must reduce the score."""
@@ -284,7 +287,7 @@ class TestTask3Grader:
             db_task3, cleaned, [],
             "bq_hard", True,
         )
-        assert score_with_reason >= 0.0
+        assert score_with_reason > 0.0
 
 
 # ---------------------------------------------------------------------------

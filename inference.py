@@ -98,7 +98,8 @@ def log_step(step: int, action: str, reward: float, done: bool,
 
 
 def log_end(success: bool, steps: int, rewards: list[float]) -> None:
-    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+    # Guard: rewards must never be empty — use "0.00" if no steps executed
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards) if rewards else "0.00"
     print(
         f"[END] success={str(success).lower()} steps={steps} "
         f"rewards={rewards_str}",
@@ -110,7 +111,8 @@ def _parse_score(feedback: str) -> Optional[float]:
     m = re.search(r"[Gg]rader\s+score\s*=?\s*(\d+\.\d+)", feedback)
     if m:
         try:
-            return float(m.group(1))
+            # Clamp to (0.01, 0.99) — score must be strictly between 0 and 1
+            return max(0.01, min(0.99, float(m.group(1))))
         except (ValueError, TypeError):
             pass
     return None
@@ -228,7 +230,9 @@ def run_task(task_id: str, intent: str = "") -> float:
         def _do_step(action_dict: dict) -> tuple[float, bool]:
             nonlocal step_num, done, obs
             step_num += 1
-            if step_num > budget or done:
+            # Always allow submit through — it must execute to produce a valid score
+            is_submit = action_dict.get("action_type") == "submit"
+            if (step_num > budget and not is_submit) or done:
                 return 0.0, True
             filtered = {k: v for k, v in action_dict.items() if v is not None}
             action = SQLSherlockAction(**filtered)
@@ -318,12 +322,12 @@ def run_task(task_id: str, intent: str = "") -> float:
             if obs.last_feedback:
                 parsed = _parse_score(obs.last_feedback)
                 if parsed is not None:
-                    score = max(0.0, min(1.0, parsed))
+                    score = parsed  # already clamped to (0.01, 0.99)
 
-        # Fallback score from cumulative positive rewards
-        if score == 0.0 and rewards:
+        # Fallback when grader score wasn't parseable — use scaled cumulative reward
+        if score < 0.01 and rewards:
             positive = sum(r for r in rewards if r > 0)
-            score = max(0.0, min(1.0, positive / max(budget * 0.15, 0.01)))
+            score = max(0.01, min(0.99, positive / max(budget * 0.15, 0.01)))
 
         success = score >= 0.50
 
