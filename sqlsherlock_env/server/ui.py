@@ -477,7 +477,7 @@ def create_ui() -> gr.Blocks:
                     agent_log = gr.Textbox(
                         label="Live Step Log",
                         lines=30, max_lines=120,
-                        interactive=False, show_copy_button=True,
+                        interactive=False,
                     )
                 with gr.Column(scale=2):
                     agent_results = gr.Markdown(
