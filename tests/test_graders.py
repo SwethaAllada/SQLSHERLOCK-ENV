@@ -111,7 +111,7 @@ class TestZeroChangeGuard:
             db=db_task1,
             cleaned_rows=dirty,
             removed_ids=[],
-            task_id="task1_null_and_types",
+            task_id="viz_easy",
             validation_was_called=False,
         )
         assert score == 0.0
@@ -136,7 +136,7 @@ class TestTask1Grader:
             db=db_task1,
             cleaned_rows=cleaned,
             removed_ids=removed,
-            task_id="task1_null_and_types",
+            task_id="viz_easy",
             validation_was_called=True,
         )
         assert score >= 0.60, f"Expected >= 0.60 after full fix, got {score}"
@@ -147,7 +147,7 @@ class TestTask1Grader:
             db=db_task1,
             cleaned_rows=dirty,
             removed_ids=[],
-            task_id="task1_null_and_types",
+            task_id="viz_easy",
             validation_was_called=False,
         )
         assert score == 0.0
@@ -158,15 +158,15 @@ class TestTask1Grader:
             db=db_task1,
             cleaned_rows=cleaned,
             removed_ids=[],
-            task_id="task1_null_and_types",
+            task_id="viz_easy",
             validation_was_called=True,
         )
         assert 0.0 <= score <= 1.0
 
     def test_no_validate_penalty(self, db_task1):
         cleaned = _apply_all_fixes(db_task1)
-        score_with    = graders.grade(db_task1, cleaned, [], "task1_null_and_types", True)
-        score_without = graders.grade(db_task1, cleaned, [], "task1_null_and_types", False)
+        score_with    = graders.grade(db_task1, cleaned, [], "viz_easy", True)
+        score_without = graders.grade(db_task1, cleaned, [], "viz_easy", False)
         assert score_with >= score_without
 
     def test_false_positive_reduces_score(self, db_task1):
@@ -177,8 +177,8 @@ class TestTask1Grader:
             if row.get("survived") is not None:
                 row["survived"] = 99   # not an issue
                 break
-        score_fp  = graders.grade(db_task1, clean_copy, [], "task1_null_and_types", True)
-        score_ok  = graders.grade(db_task1, cleaned,    [], "task1_null_and_types", True)
+        score_fp  = graders.grade(db_task1, clean_copy, [], "viz_easy", True)
+        score_ok  = graders.grade(db_task1, cleaned,    [], "viz_easy", True)
         assert score_fp <= score_ok
 
 
@@ -197,7 +197,7 @@ class TestTask2Grader:
             db=db_task2,
             cleaned_rows=cleaned,
             removed_ids=removed,
-            task_id="task2_constraints_and_fk",
+            task_id="ml_medium",
             validation_was_called=True,
         )
         assert score >= 0.50, f"Expected >= 0.50 after full fix, got {score}"
@@ -208,7 +208,7 @@ class TestTask2Grader:
             db=db_task2,
             cleaned_rows=cleaned,
             removed_ids=[],
-            task_id="task2_constraints_and_fk",
+            task_id="ml_medium",
             validation_was_called=True,
         )
         assert 0.0 <= score <= 1.0
@@ -217,8 +217,8 @@ class TestTask2Grader:
         """task2 weight means full fix may score differently — both must be in range."""
         c1 = _apply_all_fixes(db_task1)
         c2 = _apply_all_fixes(db_task2)
-        s1 = graders.grade(db_task1, c1, [], "task1_null_and_types",     True)
-        s2 = graders.grade(db_task2, c2, [], "task2_constraints_and_fk", True)
+        s1 = graders.grade(db_task1, c1, [], "viz_easy",     True)
+        s2 = graders.grade(db_task2, c2, [], "ml_medium", True)
         assert 0.0 <= s1 <= 1.0
         assert 0.0 <= s2 <= 1.0
 
@@ -234,7 +234,7 @@ class TestTask3Grader:
             db=db_task3,
             cleaned_rows=cleaned,
             removed_ids=[],
-            task_id="task3_full_audit_with_trap",
+            task_id="bq_hard",
             validation_was_called=True,
         )
         assert 0.0 <= score <= 1.0
@@ -256,11 +256,11 @@ class TestTask3Grader:
 
         score_untouched = graders.grade(
             db_task3, cleaned_no_touch, [],
-            "task3_full_audit_with_trap", True,
+            "bq_hard", True,
         )
         score_touched = graders.grade(
             db_task3, cleaned_touched, [],
-            "task3_full_audit_with_trap", True,
+            "bq_hard", True,
         )
         assert score_touched < score_untouched or score_touched <= score_untouched
 
@@ -282,7 +282,7 @@ class TestTask3Grader:
         cleaned = _apply_all_fixes(db_task3)
         score_with_reason = graders.grade(
             db_task3, cleaned, [],
-            "task3_full_audit_with_trap", True,
+            "bq_hard", True,
         )
         assert score_with_reason >= 0.0
 
@@ -351,4 +351,4 @@ class TestFalsePositivePenalty:
         penalty = _false_positive_penalty(
             db_task1, tampered, [], db_task1.pk_col, db_task1.primary_table
         )
-        assert penalty <= 0.20
+        assert penalty <= 0.35

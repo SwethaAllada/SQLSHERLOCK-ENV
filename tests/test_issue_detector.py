@@ -231,25 +231,25 @@ class TestDetectIssues:
     def test_task1_minimum_issues(self, dirty_conn, dirty_profile):
         records = copy.deepcopy(DIRTY_RECORDS)
         issues = detect_issues(dirty_conn, dirty_profile, records,
-                               task_id="task1_null_and_types", seed=42)
-        assert len(issues) >= MINIMUM_ISSUES["task1_null_and_types"]
+                               task_id="viz_easy", seed=42)
+        assert len(issues) >= MINIMUM_ISSUES["viz_easy"]
 
     def test_task2_minimum_issues(self, dirty_conn, dirty_profile):
         records = copy.deepcopy(DIRTY_RECORDS)
         issues = detect_issues(dirty_conn, dirty_profile, records,
-                               task_id="task2_constraints_and_fk", seed=42)
-        assert len(issues) >= MINIMUM_ISSUES["task2_constraints_and_fk"]
+                               task_id="ml_medium", seed=42)
+        assert len(issues) >= MINIMUM_ISSUES["ml_medium"]
 
     def test_task3_minimum_issues(self, dirty_conn, dirty_profile):
         records = copy.deepcopy(DIRTY_RECORDS)
         issues = detect_issues(dirty_conn, dirty_profile, records,
-                               task_id="task3_full_audit_with_trap", seed=42)
-        assert len(issues) >= MINIMUM_ISSUES["task3_full_audit_with_trap"]
+                               task_id="bq_hard", seed=42)
+        assert len(issues) >= MINIMUM_ISSUES["bq_hard"]
 
     def test_task1_only_null_and_type_issues(self, dirty_conn, dirty_profile):
         records = copy.deepcopy(DIRTY_RECORDS)
         issues = detect_issues(dirty_conn, dirty_profile, records,
-                               task_id="task1_null_and_types", seed=42)
+                               task_id="viz_easy", seed=42)
         for iss in issues:
             assert iss.issue_type in ("null", "type_error"), (
                 f"task1 should only detect null/type_error, got {iss.issue_type}"
@@ -258,14 +258,14 @@ class TestDetectIssues:
     def test_no_duplicate_issue_ids(self, dirty_conn, dirty_profile):
         records = copy.deepcopy(DIRTY_RECORDS)
         issues = detect_issues(dirty_conn, dirty_profile, records,
-                               task_id="task3_full_audit_with_trap", seed=42)
+                               task_id="bq_hard", seed=42)
         ids = [i.issue_id for i in issues]
         assert len(ids) == len(set(ids)), "Duplicate issue_ids found"
 
     def test_confidence_in_range(self, dirty_conn, dirty_profile):
         records = copy.deepcopy(DIRTY_RECORDS)
         issues = detect_issues(dirty_conn, dirty_profile, records,
-                               task_id="task3_full_audit_with_trap", seed=42)
+                               task_id="bq_hard", seed=42)
         for iss in issues:
             assert 0.0 <= iss.confidence <= 1.0, (
                 f"Issue {iss.issue_id} has out-of-range confidence {iss.confidence}"
@@ -275,8 +275,8 @@ class TestDetectIssues:
         """Clean data triggers synthetic top-up to meet minimum."""
         records = copy.deepcopy(CLEAN_RECORDS)
         issues = detect_issues(clean_conn, clean_profile, records,
-                               task_id="task1_null_and_types", seed=42)
-        assert len(issues) >= MINIMUM_ISSUES["task1_null_and_types"]
+                               task_id="viz_easy", seed=42)
+        assert len(issues) >= MINIMUM_ISSUES["viz_easy"]
 
     def test_reproducible_with_same_seed(self, dirty_conn, dirty_profile):
         conn2 = _make_conn(DIRTY_RECORDS)
@@ -284,9 +284,9 @@ class TestDetectIssues:
         r1 = copy.deepcopy(DIRTY_RECORDS)
         r2 = copy.deepcopy(DIRTY_RECORDS)
         issues1 = detect_issues(dirty_conn, dirty_profile, r1,
-                                task_id="task1_null_and_types", seed=99)
+                                task_id="viz_easy", seed=99)
         issues2 = detect_issues(conn2, profile2, r2,
-                                task_id="task1_null_and_types", seed=99)
+                                task_id="viz_easy", seed=99)
         assert len(issues1) == len(issues2)
         conn2.close()
 
@@ -299,7 +299,7 @@ class TestDetectTrap:
     def test_trap_planted_for_task3(self, dirty_conn, dirty_profile):
         records = copy.deepcopy(DIRTY_RECORDS)
         issues = detect_issues(dirty_conn, dirty_profile, records,
-                               task_id="task3_full_audit_with_trap", seed=42)
+                               task_id="bq_hard", seed=42)
         trap = detect_trap(dirty_conn, dirty_profile, records, issues, seed=42)
         assert trap is not None
         assert isinstance(trap, Trap)
@@ -307,7 +307,7 @@ class TestDetectTrap:
     def test_trap_not_in_issue_registry(self, dirty_conn, dirty_profile):
         records = copy.deepcopy(DIRTY_RECORDS)
         issues = detect_issues(dirty_conn, dirty_profile, records,
-                               task_id="task3_full_audit_with_trap", seed=42)
+                               task_id="bq_hard", seed=42)
         trap = detect_trap(dirty_conn, dirty_profile, records, issues, seed=42)
         if trap is None:
             pytest.skip("No numeric column available for trap")
@@ -317,7 +317,7 @@ class TestDetectTrap:
     def test_trap_value_is_2x_original(self, dirty_conn, dirty_profile):
         records = copy.deepcopy(DIRTY_RECORDS)
         issues = detect_issues(dirty_conn, dirty_profile, records,
-                               task_id="task3_full_audit_with_trap", seed=42)
+                               task_id="bq_hard", seed=42)
         trap = detect_trap(dirty_conn, dirty_profile, records, issues, seed=42)
         if trap is None:
             pytest.skip("No numeric column available for trap")
@@ -327,7 +327,7 @@ class TestDetectTrap:
     def test_trap_written_to_sqlite(self, dirty_conn, dirty_profile):
         records = copy.deepcopy(DIRTY_RECORDS)
         issues = detect_issues(dirty_conn, dirty_profile, records,
-                               task_id="task3_full_audit_with_trap", seed=42)
+                               task_id="bq_hard", seed=42)
         trap = detect_trap(dirty_conn, dirty_profile, records, issues, seed=42)
         if trap is None:
             pytest.skip("No numeric column available for trap")

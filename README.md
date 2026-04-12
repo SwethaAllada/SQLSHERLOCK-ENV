@@ -96,24 +96,26 @@ reset(dataset, task_id, intent)
 
 ## Scoring Formulas
 
+**Easy scores most** — the basic cleaning foundation counts for the most weight in every cascade.
+
 ### Easy
 ```
-score = resolution(null + type_error + whitespace + category) × 0.70
-      + validation × 0.30
+score = resolution(null + type_error + whitespace + category) × 0.80
+      + validation × 0.20
       − fp_penalty
 ```
 
-### Medium
+### Medium  (easy = 70% of the score)
 ```
-score = easy_score × 0.40
-      + avg(constraint_resolved + outlier_resolved) × 0.60
+score = easy_score × 0.70
+      + avg(constraint_resolved + outlier_resolved + duplicate_resolved) × 0.30
       − fp_penalty
 ```
 
-### Hard
+### Hard  (medium = 70% of the score)
 ```
 # With FK violations:
-score = medium_score × 0.50 + fk_resolved × 0.50 + reasoning_bonus − trap_penalty
+score = medium_score × 0.70 + fk_resolved × 0.30 + reasoning_bonus − trap_penalty
 
 # Single-table dataset (no FK violations to find):
 score = medium_score + reasoning_bonus − trap_penalty
@@ -217,6 +219,36 @@ Dense per-step rewards — every action returns a signal:
 | `distribution_check` | Column mean drift < 20% from baseline |
 | `duplicate_check` | Duplicate count reduced |
 | `outlier_check` | Flagged outlier rows within acceptable range of median |
+
+---
+
+## Multiple Tables
+
+Upload **2–3 files** in the Agent Demo tab. They are merged into a multi-sheet XLSX — each sheet becomes a separate SQLite table. The agent will:
+
+1. `select_tables` — list all available tables
+2. Inspect schemas and attempt `join_tables` with the best matching key column
+3. Profile and bulk-fix each table independently
+
+**Supported formats per file:** CSV, JSON, JSONL, Parquet, XLSX
+
+Alternatively, upload a **single XLSX with multiple sheets** — each sheet loads as a separate table automatically.
+
+---
+
+## Business Query Feature
+
+For the **Business Analytics** intent, enter a SQL `SELECT` query in the UI. After the agent finishes cleaning (Hard task), the query runs on the cleaned in-memory database and results are displayed in the UI.
+
+```sql
+-- Example
+SELECT "Pclass", COUNT(*) AS passengers, AVG("Fare") AS avg_fare
+FROM dataset
+GROUP BY "Pclass"
+ORDER BY avg_fare DESC
+```
+
+Works on any intent — not just business_query.
 
 ---
 

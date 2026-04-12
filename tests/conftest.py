@@ -127,10 +127,10 @@ def clean_profile():
 
 @pytest.fixture
 def db_task1():
-    """DatabaseEngine for task1 loaded from raw CSV text."""
+    """DatabaseEngine for easy task (viz_easy) loaded from raw CSV text."""
     from server.database import DatabaseEngine
     db = DatabaseEngine(
-        task_id="task1_null_and_types",
+        task_id="viz_easy",
         seed=42,
         dataset_source=RAW_CSV_TEXT,
         max_rows=50,
@@ -140,10 +140,10 @@ def db_task1():
 
 @pytest.fixture
 def db_task2():
-    """DatabaseEngine for task2 loaded from raw CSV text."""
+    """DatabaseEngine for medium task (ml_medium) loaded from raw CSV text."""
     from server.database import DatabaseEngine
     db = DatabaseEngine(
-        task_id="task2_constraints_and_fk",
+        task_id="ml_medium",
         seed=42,
         dataset_source=RAW_CSV_TEXT,
         max_rows=50,
@@ -153,10 +153,10 @@ def db_task2():
 
 @pytest.fixture
 def db_task3():
-    """DatabaseEngine for task3 loaded from raw CSV text."""
+    """DatabaseEngine for hard task (bq_hard) loaded from raw CSV text."""
     from server.database import DatabaseEngine
     db = DatabaseEngine(
-        task_id="task3_full_audit_with_trap",
+        task_id="bq_hard",
         seed=42,
         dataset_source=RAW_CSV_TEXT,
         max_rows=50,
@@ -170,7 +170,7 @@ def db_task3():
 
 @pytest.fixture
 def task1_issues(dirty_conn, dirty_profile):
-    """Issues detected for task1 on the dirty dataset."""
+    """Issues detected for viz_easy task on the dirty dataset."""
     from server.issue_detector import detect_issues
     import copy
     records = copy.deepcopy(DIRTY_RECORDS)
@@ -178,14 +178,14 @@ def task1_issues(dirty_conn, dirty_profile):
         conn=dirty_conn,
         profile=dirty_profile,
         records=records,
-        task_id="task1_null_and_types",
+        task_id="viz_easy",
         seed=42,
     )
 
 
 @pytest.fixture
 def task3_issues(dirty_conn, dirty_profile):
-    """Issues detected for task3 on the dirty dataset."""
+    """Issues detected for bq_hard task on the dirty dataset."""
     from server.issue_detector import detect_issues
     import copy
     records = copy.deepcopy(DIRTY_RECORDS)
@@ -193,6 +193,54 @@ def task3_issues(dirty_conn, dirty_profile):
         conn=dirty_conn,
         profile=dirty_profile,
         records=records,
-        task_id="task3_full_audit_with_trap",
+        task_id="bq_hard",
         seed=42,
     )
+
+
+# ---------------------------------------------------------------------------
+# Multi-table XLSX fixture
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def multi_table_xlsx_path():
+    """Create a temp XLSX with two sheets for multi-table testing.
+
+    Sheet 1 — 'passengers': 10 rows with null/type/constraint issues.
+    Sheet 2 — 'classes':     3 rows (lookup table, clean).
+    Both sheets share the 'id' column so join_tables can be tested.
+    """
+    import tempfile
+    import pandas as pd
+
+    df_passengers = pd.DataFrame([
+        {"id": 1,  "name": "Alice",  "age": None,    "fare": 10.50, "survived": 1},
+        {"id": 2,  "name": "Bob",    "age": 25,      "fare": 7.25,  "survived": 0},
+        {"id": 3,  "name": "Carol",  "age": "FORTY", "fare": 15.00, "survived": 1},
+        {"id": 4,  "name": "Dave",   "age": -5,      "fare": 8.00,  "survived": 0},
+        {"id": 5,  "name": "Eve",    "age": 28,      "fare": 12.00, "survived": 1},
+        {"id": 6,  "name": "Frank",  "age": 45,      "fare": 9.75,  "survived": 0},
+        {"id": 7,  "name": "Grace",  "age": 33,      "fare": 11.50, "survived": 1},
+        {"id": 8,  "name": "Heidi",  "age": 29,      "fare": 6.50,  "survived": 0},
+        {"id": 9,  "name": "Ivan",   "age": 38,      "fare": 13.25, "survived": 1},
+        {"id": 10, "name": "Judy",   "age": 22,      "fare": 5.00,  "survived": 0},
+    ])
+
+    df_classes = pd.DataFrame([
+        {"id": 1, "class_name": "First",   "min_fare": 30.0},
+        {"id": 2, "class_name": "Second",  "min_fare": 10.0},
+        {"id": 3, "class_name": "Third",   "min_fare": 5.0},
+        {"id": 4, "class_name": "Fourth",  "min_fare": 3.0},
+        {"id": 5, "class_name": "Fifth",   "min_fare": 2.0},
+    ])
+
+    tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
+    tmp.close()
+
+    with pd.ExcelWriter(tmp.name, engine="openpyxl") as writer:
+        df_passengers.to_excel(writer, sheet_name="passengers", index=False)
+        df_classes.to_excel(writer, sheet_name="classes", index=False)
+
+    yield tmp.name
+
+    os.unlink(tmp.name)

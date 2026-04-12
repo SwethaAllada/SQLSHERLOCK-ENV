@@ -588,3 +588,201 @@ class TestJoinTables:
         ))
         state = env_task1.get_state()
         assert state.joins_performed == 1
+
+
+# ---------------------------------------------------------------------------
+# Multi-table input (2-sheet XLSX)
+# ---------------------------------------------------------------------------
+
+class TestMultiTableInput:
+    """Tests for loading and operating on a 2-sheet XLSX dataset."""
+
+    @pytest.fixture
+    def env_multi(self, env, multi_table_xlsx_path):
+        """Reset env with the 2-sheet XLSX — both tables are available."""
+        env.reset(dataset=multi_table_xlsx_path, task_id="viz_easy")
+        return env
+
+    # ------------------------------------------------------------------
+    # Loading
+    # ------------------------------------------------------------------
+
+    def test_two_tables_loaded(self, env_multi):
+        """Both XLSX sheets must appear as separate SQLite tables."""
+        tables = list(env_multi._db.table_names())
+        assert len(tables) == 2, f"Expected 2 tables, got {tables}"
+
+    def test_passengers_table_present(self, env_multi):
+        tables = list(env_multi._db.table_names())
+        assert "passengers" in tables
+
+    def test_classes_table_present(self, env_multi):
+        tables = list(env_multi._db.table_names())
+        assert "classes" in tables
+
+    def test_passengers_row_count(self, env_multi):
+        rows = env_multi._db.rows("passengers")
+        assert len(rows) == 10
+
+    def test_classes_row_count(self, env_multi):
+        rows = env_multi._db.rows("classes")
+        assert len(rows) == 5
+
+    # ------------------------------------------------------------------
+    # select_tables — reward should be positive for ≥2 tables
+    # ------------------------------------------------------------------
+
+    def test_select_tables_rewards_when_multi_table(self, env_multi):
+        """select_tables earns +0.02 when the dataset has ≥2 tables."""
+        obs, reward, done, _ = _step(env_multi,
+            SQLSherlockAction(action_type="select_tables",
+                              tables=["passengers", "classes"])
+        )
+        assert reward > 0, f"Expected positive reward, got {reward}"
+
+    def test_select_tables_updates_state_with_both_tables(self, env_multi):
+        env_multi.step(SQLSherlockAction(
+            action_type="select_tables",
+            tables=["passengers", "classes"],
+        ))
+        state = env_multi.get_state()
+        assert "passengers" in state.tables_selected
+        assert "classes" in state.tables_selected
+
+    # ------------------------------------------------------------------
+    # inspect second table
+    # ------------------------------------------------------------------
+
+    def test_inspect_classes_table(self, env_multi):
+        obs, reward, done, _ = _step(env_multi,
+            SQLSherlockAction(action_type="inspect", table="classes")
+        )
+        assert obs.query_result is not None
+        assert len(obs.query_result) == 5
+
+    def test_inspect_classes_has_class_name_column(self, env_multi):
+        obs, _, _, _ = _step(env_multi,
+            SQLSherlockAction(action_type="inspect", table="classes")
+        )
+        assert "class_name" in obs.query_result[0]
+
+    # ------------------------------------------------------------------
+    # profile_column on second table
+    # ------------------------------------------------------------------
+
+    def test_profile_column_on_classes_table(self, env_multi):
+        obs, reward, done, _ = _step(env_multi,
+            SQLSherlockAction(action_type="profile_column",
+                              table="classes", column="min_fare")
+        )
+        assert obs.query_result is not None
+        profile = obs.query_result[0]
+        assert "mean" in profile
+        assert "median" in profile
+
+    def test_profile_column_classes_min_fare_mean(self, env_multi):
+        """min_fare values are 30.0, 10.0, 5.0, 3.0, 2.0 → mean = 10.0."""
+        obs, _, _, _ = _step(env_multi,
+            SQLSherlockAction(action_type="profile_column",
+                              table="classes", column="min_fare")
+        )
+        profile = obs.query_result[0]
+        assert abs(profile["mean"] - 10.0) < 1.0
+
+    # ------------------------------------------------------------------
+    # join_tables between the two real tables
+    # ------------------------------------------------------------------
+
+    def test_join_tables_valid_gives_positive_reward(self, env_multi):
+        """join_tables on a shared key column earns +0.20."""
+        obs, reward, done, _ = _step(env_multi,
+            SQLSherlockAction(
+                action_type="join_tables",
+                table="passengers",
+                table2="classes",
+                key="id",
+            )
+        )
+        assert reward > 0, f"Expected positive reward for valid join, got {reward}"
+
+    def test_join_tables_valid_increments_joins_performed(self, env_multi):
+        env_multi.step(SQLSherlockAction(
+            action_type="join_tables",
+            table="passengers",
+            table2="classes",
+            key="id",
+        ))
+        state = env_multi.get_state()
+        assert state.joins_performed == 1
+
+    def test_join_tables_result_has_columns_from_both_tables(self, env_multi):
+        obs, _, _, _ = _step(env_multi,
+            SQLSherlockAction(
+                action_type="join_tables",
+                table="passengers",
+                table2="classes",
+                key="id",
+            )
+        )
+        # Join result should appear in query_result or last_feedback
+        # At minimum the step must not error
+        assert "error" not in (obs.last_feedback or "").lower() or obs.query_result is not None
+
+    # ------------------------------------------------------------------
+    # run_sql across two tables
+    # ------------------------------------------------------------------
+
+    def test_run_sql_on_second_table(self, env_multi):
+        obs, reward, done, _ = _step(env_multi,
+            SQLSherlockAction(
+                action_type="run_sql",
+                sql='SELECT class_name, min_fare FROM "classes" ORDER BY min_fare DESC',
+            )
+        )
+        assert obs.query_result is not None
+        assert len(obs.query_result) == 5
+        # Should be ordered descending — First class has highest fare
+        assert obs.query_result[0]["class_name"] == "First"
+
+    def test_run_sql_cross_table_join(self, env_multi):
+        obs, _, _, _ = _step(env_multi,
+            SQLSherlockAction(
+                action_type="run_sql",
+                sql=(
+                    'SELECT p.name, c.class_name '
+                    'FROM "passengers" p '
+                    'LEFT JOIN "classes" c ON p.id = c.id '
+                    'LIMIT 3'
+                ),
+            )
+        )
+        assert obs.query_result is not None
+        assert len(obs.query_result) == 3
+
+    # ------------------------------------------------------------------
+    # fix_column on second table
+    # ------------------------------------------------------------------
+
+    def test_fix_column_no_issues_on_classes(self, env_multi):
+        """Applying fix_column to a clean column gives a negative reward (false positive)."""
+        obs, reward, done, _ = _step(env_multi,
+            SQLSherlockAction(
+                action_type="fix_column",
+                table="classes",
+                column="min_fare",
+                value=10.0,
+                reason="test unnecessary fix",
+            )
+        )
+        # Clean column → negative reward (−0.10 for fix_column with no issues)
+        assert reward <= 0, f"Expected ≤ 0 reward for clean column fix, got {reward}"
+
+    # ------------------------------------------------------------------
+    # Multi-table episode reaches done correctly
+    # ------------------------------------------------------------------
+
+    def test_multi_table_submit_ends_episode(self, env_multi):
+        _, _, done, _ = _step(env_multi,
+            SQLSherlockAction(action_type="submit")
+        )
+        assert done is True

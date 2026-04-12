@@ -85,10 +85,14 @@ def log_start(task: str, model: str) -> None:
 def log_step(step: int, action: str, reward: float, done: bool,
              error: Optional[str] = None) -> None:
     action_str = action.replace("\n", " ").replace("\r", " ").strip()[:120]
+    error_str  = (
+        error.replace("\n", " ").replace("\r", " ").strip()[:120]
+        if error else "null"
+    )
     print(
         f"[STEP] step={step} action={action_str} "
         f"reward={reward:.2f} done={str(done).lower()} "
-        f"error={error if error else 'null'}",
+        f"error={error_str}",
         flush=True,
     )
 
@@ -195,10 +199,10 @@ def run_task(task_id: str, intent: str = "") -> float:
 
     budget      = STEP_BUDGETS[task_id]
     rewards: list[float] = []
-    steps_taken = 0
+    step_num    = 0        # initialised here so except/finally can always read it
     score       = 0.0
     success     = False
-    env         = None   # initialised inside try so finally can check
+    env         = None     # initialised inside try so finally can check
 
     log_start(task=task_id, model=MODEL_NAME)
 
@@ -216,8 +220,7 @@ def run_task(task_id: str, intent: str = "") -> float:
         columns      = obs.tables_summary.get(table, {}).get("columns", [])
         visible_cols = [c for c in columns if c not in ("id", "_source_format")]
 
-        done     = False
-        step_num = 0
+        done         = False
         col_profiles: dict[str, dict] = {}
 
         llm_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -322,13 +325,12 @@ def run_task(task_id: str, intent: str = "") -> float:
             positive = sum(r for r in rewards if r > 0)
             score = max(0.0, min(1.0, positive / max(budget * 0.15, 0.01)))
 
-        success     = score >= 0.50
-        steps_taken = step_num
+        success = score >= 0.50
 
     except Exception as exc:
         # Catch-all — log a terminal error step so judges see what failed
         log_step(
-            max(steps_taken + 1, 1), "error", 0.0, True,
+            max(step_num + 1, 1), "error", 0.0, True,
             f"{type(exc).__name__}: {str(exc)[:60]}",
         )
 
@@ -339,7 +341,7 @@ def run_task(task_id: str, intent: str = "") -> float:
                 env.close()
             except Exception:
                 pass
-        log_end(success=success, steps=steps_taken, rewards=rewards)
+        log_end(success=success, steps=step_num, rewards=rewards)
 
     return score
 

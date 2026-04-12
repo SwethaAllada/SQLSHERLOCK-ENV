@@ -88,5 +88,6 @@ def grade(
     )
 
     combined = (c_score + o_score + d_score) / 3.0
-    raw = t1 * 0.40 + combined * 0.60 - fp_penalty
+    # Easy (task1) gets the highest weight — basic cleaning matters most.
+    raw = t1 * 0.70 + combined * 0.30 - fp_penalty
     return max(0.0, min(1.0, round(raw, 4)))

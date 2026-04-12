@@ -82,18 +82,18 @@ def grade(
     # again here to avoid double-counting.
 
     if fk_issues:
-        # Dataset has FK violations — score FK resolution as 50% of hard grade
+        # Medium (task2) gets highest weight — medium cleaning is the foundation.
+        # FK resolution adds the hard-level component at 30%.
         fk_score, _ = _resolution_score(fk_issues, cleaned_rows, removed_ids, pk_col, db)
         raw = (
-            t2        * 0.50
-            + fk_score  * 0.50
+            t2        * 0.70
+            + fk_score  * 0.30
             + r_bonus
             - trap_pen
         )
     else:
         # Single-table dataset — no FK issues to resolve.
-        # Hard difficulty is demonstrated entirely through trap avoidance and reasoning.
-        # Grade purely on medium performance + trap + reasoning (no free FK credit).
+        # Hard difficulty demonstrated through trap avoidance and reasoning.
         raw = t2 + r_bonus - trap_pen
 
     return max(0.0, min(1.0, round(raw, 4)))
