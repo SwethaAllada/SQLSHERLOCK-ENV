@@ -131,7 +131,7 @@ async def upload_dataset(file: UploadFile = File(...)) -> dict:
         "detected_issues_preview":  issue_preview,
         "usage_example": (
             f'{{"dataset": "{filename}", '
-            f'"task_id": "task1_visualization_prep"}}'
+            f'"task_id": "viz_easy"}}'
         ),
     }
 

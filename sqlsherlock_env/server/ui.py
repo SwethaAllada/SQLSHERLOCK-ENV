@@ -538,8 +538,8 @@ def run_agent_streaming(
     _log(f"Intent : {intent_label}")
     _log(f"Dataset: {src_label}")
     _log(f"Format : {output_format}")
-    if user_requirement.strip():
-        _log(f"Goal   : {user_requirement.strip()[:100]}")
+    if (user_requirement or "").strip():
+        _log(f"Goal   : {(user_requirement or '').strip()[:100]}")
     _log("")
     yield emit()
 
@@ -666,9 +666,11 @@ def run_agent_streaming(
             # Phase 4: Business query SQL (run before export so DB is still live)
             if not done and task_id.endswith("_hard"):
                 # Determine SQL to run
-                run_sql = biz_sql.strip() if biz_sql.strip() else None
-                if run_sql is None and intent == "business_query" and user_requirement.strip():
-                    run_sql = _nl_to_sql(user_requirement, table, visible)
+                _biz = (biz_sql or "").strip()
+                run_sql = _biz if _biz else None
+                _req   = (user_requirement or "").strip()
+                if run_sql is None and intent == "business_query" and _req:
+                    run_sql = _nl_to_sql(_req, table, visible)
                     if run_sql:
                         auto_sql_used = run_sql
                         _log(f"  [auto-SQL generated from question]")

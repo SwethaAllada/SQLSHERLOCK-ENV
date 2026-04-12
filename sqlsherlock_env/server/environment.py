@@ -463,7 +463,7 @@ class SQLSherlockEnvironment(Environment):
 
             elif atype == "export":
                 cleaned_rows  = action.cleaned_rows or self._db.current_state()
-                removed_ids   = action.removed_ids or []
+                removed_ids   = action.removed_ids if action.removed_ids is not None else list(self._deleted_row_ids)
                 score = graders.grade(
                     db=self._db,
                     cleaned_rows=cleaned_rows,

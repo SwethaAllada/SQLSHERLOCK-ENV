@@ -216,7 +216,7 @@ def run_task(task_id: str, intent: str = "") -> float:
             intent=intent or None,
         )
 
-        table        = list(obs.tables_summary.keys())[0] if obs.tables_summary else "dataset"
+        table        = list(obs.tables_summary.keys())[0] if obs.tables_summary else (DEMO_DATASET.split("/")[-1])
         columns      = obs.tables_summary.get(table, {}).get("columns", [])
         visible_cols = [c for c in columns if c not in ("id", "_source_format")]
 

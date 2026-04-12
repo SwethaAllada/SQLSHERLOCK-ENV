@@ -486,7 +486,10 @@ class Validator:
                 detail="No outliers in baseline.",
             )
 
-        pk_col = list(records[0].keys())[0] if records else "id"
+        pk_col = next(
+            (k for k in (records[0].keys() if records else []) if k != "_source_format"),
+            "id",
+        )
         row_map = {int(r[pk_col]): r for r in records if not _is_null(r.get(pk_col))}
 
         still_outliers: set[tuple] = set()

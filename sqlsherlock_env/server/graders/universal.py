@@ -110,7 +110,7 @@ def _resolution_score(
     if not issues:
         return 1.0, 1.0   # No issues to resolve → full resolution score
 
-    cleaned_map = {row[pk_col]: row for row in cleaned_rows}
+    cleaned_map = {row.get(pk_col): row for row in cleaned_rows if row.get(pk_col) is not None}
     removed_set  = set(removed_ids)
     total_weight = sum(i.confidence for i in issues)
 
@@ -294,7 +294,7 @@ def _false_positive_penalty(
 ) -> float:
     """Penalise changes to cells that were not in the issue registry."""
     originals = db._originals.get(primary_table, [])
-    orig_map   = {row[pk_col]: row for row in originals}
+    orig_map   = {row.get(pk_col): row for row in originals if row.get(pk_col) is not None}
     issue_cells = {
         (i.row_id, i.column)
         for i in db.issue_registry
@@ -321,7 +321,7 @@ def _false_positive_penalty(
 
     # Rows that were deleted but should NOT have been
     orig_ids    = set(orig_map.keys())
-    cleaned_ids = {row[pk_col] for row in cleaned_rows} | removed_set
+    cleaned_ids = {row.get(pk_col) for row in cleaned_rows if row.get(pk_col) is not None} | removed_set
     wrongly_removed = orig_ids - cleaned_ids - issue_rows
     fp_count += len(wrongly_removed)
 
@@ -343,7 +343,7 @@ def _trap_penalty(
         return 0.0
 
     removed_set = set(removed_ids)
-    cleaned_map = {row[pk_col]: row for row in cleaned_rows}
+    cleaned_map = {row.get(pk_col): row for row in cleaned_rows if row.get(pk_col) is not None}
 
     # Trap hit if row was deleted OR value was changed from trap_value
     if trap.row_id in removed_set:
@@ -420,7 +420,7 @@ def _rows_identical(
     """Return True if cleaned_rows has the same values as dirty_rows."""
     if len(cleaned_rows) != len(dirty_rows):
         return False
-    dirty_map = {row[pk_col]: row for row in dirty_rows}
+    dirty_map = {row.get(pk_col): row for row in dirty_rows if row.get(pk_col) is not None}
     for row in cleaned_rows:
         rid  = row.get(pk_col)
         orig = dirty_map.get(rid)

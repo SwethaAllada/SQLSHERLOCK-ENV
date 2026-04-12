@@ -288,7 +288,7 @@ def _load_xlsx_sheets(path: str, max_rows: int) -> dict[str, list[dict]]:
         headers = [str(h) if h is not None else f"col_{i}" for i, h in enumerate(rows[0])]
         records = []
         for row in rows[1: max_rows + 1]:
-            record = {headers[i]: row[i] for i in range(len(headers))}
+            record = {headers[i]: (row[i] if i < len(row) else None) for i in range(len(headers))}
             records.append(record)
 
         if records:

@@ -71,6 +71,7 @@ class _AsyncSQLSherlockClient(
             last_feedback=obs_data.get("last_feedback", ""),
             reward_trace=obs_data.get("reward_trace", []),
             done=payload.get("done", False),
+            intent=obs_data.get("intent"),
         )
 
         return StepResult(
@@ -90,6 +91,10 @@ class _AsyncSQLSherlockClient(
             source_format=payload.get("source_format", ""),
             investigation_count=payload.get("investigation_count", 0),
             validation_called=payload.get("validation_called", False),
+            intent=payload.get("intent"),
+            tables_selected=payload.get("tables_selected", []),
+            joins_performed=payload.get("joins_performed", 0),
+            output_format=payload.get("output_format"),
         )
 
 
